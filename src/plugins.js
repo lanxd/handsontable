@@ -1,7 +1,7 @@
 /**
  * Utility to register plugins and common namespace for keeping reference to all plugins classes
  */
-
+import Hooks from './pluginHooks';
 import {objectEach} from './helpers/object';
 import {toUpperCaseFirst} from './helpers/string';
 
@@ -16,8 +16,8 @@ const registeredPlugins = new WeakMap();
 function registerPlugin(pluginName, PluginClass) {
   pluginName = toUpperCaseFirst(pluginName);
 
-  Handsontable.hooks.add('construct', function () {
-    var holder;
+  Hooks.getSingleton().add('construct', function() {
+    let holder;
 
     if (!registeredPlugins.has(this)) {
       registeredPlugins.set(this, {});
@@ -28,17 +28,11 @@ function registerPlugin(pluginName, PluginClass) {
       holder[pluginName] = new PluginClass(this);
     }
   });
-  Handsontable.hooks.add('afterDestroy', function () {
-    var i, pluginsHolder;
-
+  Hooks.getSingleton().add('afterDestroy', function() {
     if (registeredPlugins.has(this)) {
-      pluginsHolder = registeredPlugins.get(this);
+      let pluginsHolder = registeredPlugins.get(this);
 
-      for (i in pluginsHolder) {
-        if (pluginsHolder.hasOwnProperty(i)) {
-          pluginsHolder[i].destroy();
-        }
-      }
+      objectEach(pluginsHolder, (plugin) => plugin.destroy());
       registeredPlugins.delete(this);
     }
   });

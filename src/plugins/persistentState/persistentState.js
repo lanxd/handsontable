@@ -1,33 +1,29 @@
-
+import Hooks from './../../pluginHooks';
 import {registerPlugin} from './../../plugins';
-
-export {HandsontablePersistentState};
-
-//registerPlugin('persistentState', HandsontablePersistentState);
+import {hasOwnProperty} from './../../helpers/object';
 
 function Storage(prefix) {
-
   var savedKeys;
 
-  var saveSavedKeys = function () {
-    window.localStorage[prefix + '__' + 'persistentStateKeys'] = JSON.stringify(savedKeys);
+  var saveSavedKeys = function() {
+    window.localStorage[`${prefix}__persistentStateKeys`] = JSON.stringify(savedKeys);
   };
 
-  var loadSavedKeys = function () {
-    var keysJSON = window.localStorage[prefix + '__' + 'persistentStateKeys'];
+  var loadSavedKeys = function() {
+    var keysJSON = window.localStorage[`${prefix}__persistentStateKeys`];
     var keys = typeof keysJSON == 'string' ? JSON.parse(keysJSON) : void 0;
     savedKeys = keys ? keys : [];
   };
 
-  var clearSavedKeys = function () {
+  var clearSavedKeys = function() {
     savedKeys = [];
     saveSavedKeys();
   };
 
   loadSavedKeys();
 
-  this.saveValue = function (key, value) {
-    window.localStorage[prefix + '_' + key] = JSON.stringify(value);
+  this.saveValue = function(key, value) {
+    window.localStorage[`${prefix}_${key}`] = JSON.stringify(value);
     if (savedKeys.indexOf(key) == -1) {
       savedKeys.push(key);
       saveSavedKeys();
@@ -35,23 +31,22 @@ function Storage(prefix) {
 
   };
 
-  this.loadValue = function (key, defaultValue) {
+  this.loadValue = function(key, defaultValue) {
 
-    key = typeof key != 'undefined' ? key : defaultValue;
+    key = typeof key === 'undefined' ? defaultValue : key;
 
-    var value = window.localStorage[prefix + '_' + key];
+    var value = window.localStorage[`${prefix}_${key}`];
 
-    return typeof value == "undefined" ? void 0 : JSON.parse(value);
-
+    return typeof value == 'undefined' ? void 0 : JSON.parse(value);
   };
 
-  this.reset = function (key) {
-    window.localStorage.removeItem(prefix + '_' + key);
+  this.reset = function(key) {
+    window.localStorage.removeItem(`${prefix}_${key}`);
   };
 
-  this.resetAll = function () {
+  this.resetAll = function() {
     for (var index = 0; index < savedKeys.length; index++) {
-      window.localStorage.removeItem(prefix + '_' + savedKeys[index]);
+      window.localStorage.removeItem(`${prefix}_${savedKeys[index]}`);
     }
 
     clearSavedKeys();
@@ -66,8 +61,7 @@ function Storage(prefix) {
 function HandsontablePersistentState() {
   var plugin = this;
 
-
-  this.init = function () {
+  this.init = function() {
     var instance = this,
       pluginSettings = instance.getSettings().persistentState;
 
@@ -88,38 +82,38 @@ function HandsontablePersistentState() {
 
   };
 
-  this.saveValue = function (key, value) {
+  this.saveValue = function(key, value) {
     var instance = this;
 
     instance.storage.saveValue(key, value);
   };
 
-  this.loadValue = function (key, saveTo) {
+  this.loadValue = function(key, saveTo) {
     var instance = this;
 
     saveTo.value = instance.storage.loadValue(key);
   };
 
-  this.resetValue = function (key) {
+  this.resetValue = function(key) {
     var instance = this;
 
-    if (typeof  key != 'undefined') {
-      instance.storage.reset(key);
-    } else {
+    if (typeof key === 'undefined') {
       instance.storage.resetAll();
+    } else {
+      instance.storage.reset(key);
     }
 
   };
 
   var hooks = {
-    'persistentStateSave': plugin.saveValue,
-    'persistentStateLoad': plugin.loadValue,
-    'persistentStateReset': plugin.resetValue
+    persistentStateSave: plugin.saveValue,
+    persistentStateLoad: plugin.loadValue,
+    persistentStateReset: plugin.resetValue
   };
 
   for (var hookName in hooks) {
-    if (hooks.hasOwnProperty(hookName)) {
-      Handsontable.hooks.register(hookName);
+    if (hasOwnProperty(hooks, hookName)) {
+      Hooks.getSingleton().register(hookName);
     }
   }
 
@@ -127,7 +121,7 @@ function HandsontablePersistentState() {
     var instance = this;
 
     for (var hookName in hooks) {
-      if (hooks.hasOwnProperty(hookName)) {
+      if (hasOwnProperty(hooks, hookName)) {
         instance.addHook(hookName, hooks[hookName]);
       }
     }
@@ -137,14 +131,16 @@ function HandsontablePersistentState() {
     var instance = this;
 
     for (var hookName in hooks) {
-      if (hooks.hasOwnProperty(hookName)) {
+      if (hasOwnProperty(hooks, hookName)) {
         instance.removeHook(hookName, hooks[hookName]);
       }
     }
   }
 }
 
-
 var htPersistentState = new HandsontablePersistentState();
-Handsontable.hooks.add('beforeInit', htPersistentState.init);
-Handsontable.hooks.add('afterUpdateSettings', htPersistentState.init);
+
+Hooks.getSingleton().add('beforeInit', htPersistentState.init);
+Hooks.getSingleton().add('afterUpdateSettings', htPersistentState.init);
+
+export default HandsontablePersistentState;

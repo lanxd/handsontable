@@ -13,6 +13,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <!--
@@ -63,7 +65,7 @@
               ],
               goGOT = document.getElementById('goGOT');
 
-            Handsontable.Dom.addEvent(goGOT, 'click', function () {
+            Handsontable.dom.addEvent(goGOT, 'click', function () {
               var test = document.getElementById('test'),
                 container = document.createElement('DIV'),
                 hot;

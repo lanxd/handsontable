@@ -1,239 +1,252 @@
 import BasePlugin from './../_base';
 import {registerPlugin} from './../../plugins';
+import {arrayEach} from './../../helpers/array';
+import freezeColumnItem from './contextMenuItem/freezeColumn';
+import unfreezeColumnItem from './contextMenuItem/unfreezeColumn';
 
+import './manualColumnFreeze.css';
+
+const privatePool = new WeakMap();
 /**
- * This plugin allows to manually "freeze" and "unfreeze" a column using the Context Menu
+ * This plugin allows to manually "freeze" and "unfreeze" a column using an entry in the Context Menu.
+ * You can turn it on by setting a `manualColumnFreeze` property to `true`.
  *
  * @plugin ManualColumnFreeze
+ * @dependencies ManualColumnMove
  */
 class ManualColumnFreeze extends BasePlugin {
-
   constructor(hotInstance) {
     super(hotInstance);
+
+    privatePool.set(this, {
+      moveByFreeze: false,
+      afterFirstUse: false,
+    });
+    /**
+     * Original column positions
+     *
+     * @type {Array}
+     */
+    this.frozenColumnsBasePositions = [];
+    /**
+     * Reference to the `ManualColumnMove` plugin.
+     */
+    this.manualColumnMovePlugin = void 0;
   }
 
+  /**
+   * Check if the plugin is enabled in the Handsontable settings.
+   *
+   * @returns {Boolean}
+   */
+  isEnabled() {
+    return !!this.hot.getSettings().manualColumnFreeze;
+  }
+
+  /**
+   * Enable plugin for this Handsontable instance.
+   */
   enablePlugin() {
     if (this.enabled) {
       return;
     }
 
-    this.addHook('modifyCol', (col) => this.onModifyCol(col));
-    this.addHook('afterContextMenuDefaultOptions', (defaultOptions) => this.addContextMenuEntry(defaultOptions));
+    this.addHook('afterContextMenuDefaultOptions', (options) => this.addContextMenuEntry(options));
+    this.addHook('afterInit', () => this.onAfterInit());
+    this.addHook('beforeColumnMove', (rows, target) => this.onBeforeColumnMove(rows, target));
 
     super.enablePlugin();
   }
 
-  isEnabled() {
-    return !!this.hot.getSettings().manualColumnFreeze;
+  /**
+   * Disable plugin for this Handsontable instance.
+   */
+  disablePlugin() {
+    let priv = privatePool.get(this);
+
+    priv.afterFirstUse = false;
+    priv.moveByFreeze = false;
+
+    super.disablePlugin();
   }
 
-  init() {
-    super.init();
+  /**
+   * Updates the plugin to use the latest options you have specified.
+   */
+  updatePlugin() {
+    this.disablePlugin();
+    this.enablePlugin();
 
-    // update plugin usages count for manualColumnPositions
-    if (typeof this.hot.manualColumnPositionsPluginUsages !== 'undefined') {
-      this.hot.manualColumnPositionsPluginUsages.push('manualColumnFreeze');
-    } else {
-      this.hot.manualColumnPositionsPluginUsages = ['manualColumnFreeze'];
+    super.updatePlugin();
+  }
+
+  /**
+   * Freeze the given column (add it to fixed columns).
+   *
+   * @param {Number} column Column index.
+   */
+  freezeColumn(column) {
+    let priv = privatePool.get(this);
+    let settings = this.hot.getSettings();
+
+    if (!priv.afterFirstUse) {
+      priv.afterFirstUse = true;
     }
 
-    this.fixedColumnsCount = this.hot.getSettings().fixedColumnsLeft;
-  }
-
-  /**
-   * 'modiftyCol' callback, prevent doubling the column translation
-   *
-   * @private
-   * @param {Number} col
-   */
-  onModifyCol(col) {
-    // if another plugin is using manualColumnPositions to modify column order, do not double the translation
-    if (this.hot.manualColumnPositionsPluginUsages.length > 1) {
-      return col;
-    }
-
-    return this.getModifiedColumnIndex(col);
-  }
-
-  getModifiedColumnIndex(col) {
-    return this.hot.manualColumnPositions[col];
-  }
-
-  /**
-   * Add the manualColumnFreeze context menu entries
-   *
-   * @private
-   * @param {Object} defaultOptions
-   */
-  addContextMenuEntry(defaultOptions) {
-    let _this = this;
-
-    defaultOptions.items.push(
-      Handsontable.plugins.ContextMenu.SEPARATOR, {
-        key: 'freeze_column',
-        name: function() {
-          let selectedColumn = _this.hot.getSelected()[1];
-
-          if (selectedColumn > _this.fixedColumnsCount - 1) {
-            return 'Freeze this column';
-          } else {
-            return 'Unfreeze this column';
-          }
-        },
-        disabled: function() {
-          let selection = _this.hot.getSelected();
-
-          return selection[1] !== selection[3];
-        },
-        callback: function() {
-          let selectedColumn = _this.hot.getSelected()[1];
-
-          if (selectedColumn > _this.fixedColumnsCount - 1) {
-            _this.freezeColumn(selectedColumn);
-          } else {
-            _this.unfreezeColumn(selectedColumn);
-          }
-        }
-      });
-  }
-
-  /**
-   * Freeze the given column (add it to fixed columns)
-   *
-   * @param {Number} col
-   */
-  freezeColumn(col) {
-    if (col <= this.fixedColumnsCount - 1) {
+    if (settings.fixedColumnsLeft === this.hot.countCols() || column <= settings.fixedColumnsLeft - 1) {
       return; // already fixed
     }
 
-    let modifiedColumn = this.getModifiedColumnIndex(col) || col;
+    priv.moveByFreeze = true;
 
-    this.checkPositionData(modifiedColumn);
-    this.modifyColumnOrder(modifiedColumn, col, null, 'freeze');
+    if (column !== this.getMovePlugin().columnsMapper.getValueByIndex(column)) {
+      this.frozenColumnsBasePositions[settings.fixedColumnsLeft] = column;
+    }
 
-    this.addFixedColumn();
+    this.getMovePlugin().moveColumn(column, settings.fixedColumnsLeft++);
 
-    this.hot.view.wt.wtOverlays.leftOverlay.refresh();
-    this.hot.view.wt.wtOverlays.adjustElementsSize();
   }
 
   /**
-   * Unfreeze the given column (remove it from fixed columns and bring to it's previous position)
+   * Unfreeze the given column (remove it from fixed columns and bring to it's previous position).
    *
-   * @param {Number} col
+   * @param {Number} column Column index.
    */
-  unfreezeColumn(col) {
-    if (col > this.fixedColumnsCount - 1) {
+  unfreezeColumn(column) {
+    let priv = privatePool.get(this);
+    let settings = this.hot.getSettings();
+
+    if (!priv.afterFirstUse) {
+      priv.afterFirstUse = true;
+    }
+
+    if (settings.fixedColumnsLeft <= 0 || (column > settings.fixedColumnsLeft - 1)) {
       return; // not fixed
     }
 
-    let returnCol = this.getBestColumnReturnPosition(col);
-    let modifiedColumn = this.getModifiedColumnIndex(col) || col;
+    let returnCol = this.getBestColumnReturnPosition(column);
 
-    this.checkPositionData(modifiedColumn);
-    this.modifyColumnOrder(modifiedColumn, col, returnCol, 'unfreeze');
-    this.removeFixedColumn();
+    priv.moveByFreeze = true;
+    settings.fixedColumnsLeft--;
 
-    this.hot.view.wt.wtOverlays.leftOverlay.refresh();
-    this.hot.view.wt.wtOverlays.adjustElementsSize();
+    this.getMovePlugin().moveColumn(column, returnCol + 1);
   }
 
   /**
-   * Increments the fixed columns count by one
-   */
-  addFixedColumn() {
-    this.hot.updateSettings({
-      fixedColumnsLeft: this.fixedColumnsCount + 1
-    });
-
-    this.fixedColumnsCount++;
-  }
-
-  /**
-   * Decrements the fixed columns count by one
-   */
-  removeFixedColumn() {
-    this.hot.updateSettings({
-      fixedColumnsLeft: this.fixedColumnsCount - 1
-    });
-
-    this.fixedColumnsCount--;
-  }
-
-  /**
-   * Checks whether 'manualColumnPositions' array needs creating and/or initializing
+   * Get the reference to the ManualColumnMove plugin.
    *
-   * @param {Number} [col]
+   * @private
+   * @returns {Object}
    */
-  checkPositionData(col) {
-    if (!this.hot.manualColumnPositions || this.hot.manualColumnPositions.length === 0) {
-      if (!this.hot.manualColumnPositions) {
-        this.hot.manualColumnPositions = [];
-      }
+  getMovePlugin() {
+    if (!this.manualColumnMovePlugin) {
+      this.manualColumnMovePlugin = this.hot.getPlugin('manualColumnMove');
     }
-    if (col) {
-      if (!this.hot.manualColumnPositions[col]) {
-        this.createPositionData(col + 1);
+
+    return this.manualColumnMovePlugin;
+  }
+
+  /**
+   * Estimates the most fitting return position for unfrozen column.
+   *
+   * @private
+   * @param {Number} column Column index.
+   */
+  getBestColumnReturnPosition(column) {
+    let movePlugin = this.getMovePlugin();
+    let settings = this.hot.getSettings();
+    let i = settings.fixedColumnsLeft;
+    let j = movePlugin.columnsMapper.getValueByIndex(i);
+    let initialCol;
+
+    if (this.frozenColumnsBasePositions[column] == null) {
+      initialCol = movePlugin.columnsMapper.getValueByIndex(column);
+
+      while (j < initialCol) {
+        i++;
+        j = movePlugin.columnsMapper.getValueByIndex(i);
       }
+
     } else {
-      this.createPositionData(this.hot.countCols());
-    }
-  }
+      initialCol = this.frozenColumnsBasePositions[column];
+      this.frozenColumnsBasePositions[column] = void 0;
 
-  /**
-   * Fills the 'manualColumnPositions' array with consecutive column indexes
-   *
-   * @param {Number} len
-   */
-  createPositionData(len) {
-    if (this.hot.manualColumnPositions.length < len) {
-      for (let i = this.hot.manualColumnPositions.length; i < len; i++) {
-        this.hot.manualColumnPositions[i] = i;
+      while (j <= initialCol) {
+        i++;
+        j = movePlugin.columnsMapper.getValueByIndex(i);
       }
-    }
-  }
-
-  /**
-   * Updates the column order array used by modifyCol callback
-   *
-   * @param {Number} col
-   * @param {Number} actualCol column index of the currently selected cell
-   * @param {Number|null} returnCol suggested return slot for the unfreezed column (can be null)
-   * @param {String} action 'freeze' or 'unfreeze'
-   */
-  modifyColumnOrder(col, actualCol, returnCol, action) {
-    if (returnCol == null) {
-      returnCol = col;
-    }
-
-    if (action === 'freeze') {
-      this.hot.manualColumnPositions.splice(this.fixedColumnsCount, 0, this.hot.manualColumnPositions.splice(actualCol, 1)[0]);
-    } else if (action === 'unfreeze') {
-      this.hot.manualColumnPositions.splice(returnCol, 0, this.hot.manualColumnPositions.splice(actualCol, 1)[0]);
-    }
-  }
-
-  /**
-   * Estimates the most fitting return position for unfreezed column
-   *
-   * @param {Number} col
-   */
-  getBestColumnReturnPosition(col) {
-    let i = this.fixedColumnsCount;
-    let j = this.getModifiedColumnIndex(i);
-    let initialCol = this.getModifiedColumnIndex(col);
-
-    while (j < initialCol) {
-      i++;
-      j = this.getModifiedColumnIndex(i);
+      i = j;
     }
 
     return i - 1;
   }
+  /**
+   * Add the manualColumnFreeze context menu entries.
+   *
+   * @private
+   * @param {Object} options Context menu options.
+   */
+  addContextMenuEntry(options) {
+    options.items.push(
+      {name: '---------'},
+      freezeColumnItem(this),
+      unfreezeColumnItem(this)
+    );
+  }
+
+  /**
+   * Enabling `manualColumnMove` plugin on `afterInit` hook.
+   *
+   * @private
+   */
+  onAfterInit() {
+    if (!this.getMovePlugin().isEnabled()) {
+      this.getMovePlugin().enablePlugin();
+    }
+  }
+
+  /**
+   * Prevent moving the rows from/to fixed area.
+   *
+   * @private
+   * @param {Array} rows
+   * @param {Number} target
+   */
+  onBeforeColumnMove(rows, target) {
+    let priv = privatePool.get(this);
+
+    if (priv.afterFirstUse && !priv.moveByFreeze) {
+      let frozenLen = this.hot.getSettings().fixedColumnsLeft;
+      let disallowMoving = target < frozenLen;
+
+      if (!disallowMoving) {
+        arrayEach(rows, (value, index, array) => {
+          if (value < frozenLen) {
+            disallowMoving = true;
+            return false;
+          }
+        });
+      }
+
+      if (disallowMoving) {
+        return false;
+      }
+    }
+
+    if (priv.moveByFreeze) {
+      priv.moveByFreeze = false;
+    }
+  }
+
+  /**
+   * Destroy plugin instance.
+   */
+  destroy() {
+    super.destroy();
+  }
 
 }
 
-export {ManualColumnFreeze};
-
 registerPlugin('manualColumnFreeze', ManualColumnFreeze);
+
+export default ManualColumnFreeze;

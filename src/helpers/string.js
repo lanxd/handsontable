@@ -1,5 +1,5 @@
-
 import {stringify} from './mixed';
+import {rangeEach} from './number';
 
 /**
  * Convert string to upper case first letter.
@@ -21,7 +21,7 @@ export function equalsIgnoreCase(...strings) {
   let unique = [];
   let length = strings.length;
 
-  while (length --) {
+  while (length--) {
     let string = stringify(strings[length]).toLowerCase();
 
     if (unique.indexOf(string) === -1) {
@@ -34,7 +34,8 @@ export function equalsIgnoreCase(...strings) {
 
 /**
  * Generates a random hex string. Used as namespace for Handsontable instance events.
- * @return {String} - 16 character random string: "92b1bfc74ec4"
+ *
+ * @return {String} Returns 16-long character random string (eq. `'92b1bfc74ec4'`).
  */
 export function randomString() {
   function s4() {
@@ -53,5 +54,37 @@ export function randomString() {
  * @returns {Boolean}
  */
 export function isPercentValue(value) {
-  return /^([0-9][0-9]?\%$)|(^100\%$)/.test(value);
+  return /^([0-9][0-9]?%$)|(^100%$)/.test(value);
+}
+
+/**
+ * Substitute strings placed beetwen square brackets into value defined in `variables` object. String names defined in
+ * square brackets must be the same as property name of `variables` object.
+ *
+ * @param {String} template Template string.
+ * @param {Object} variables Object which contains all available values which can be injected into template.
+ * @returns {String}
+ */
+export function substitute(template, variables = {}) {
+  return (`${template}`).replace(/(?:\\)?\[([^[\]]+)]/g, (match, name) => {
+    if (match.charAt(0) === '\\') {
+      return match.substr(1, match.length - 1);
+    }
+
+    return variables[name] === void 0 ? '' : variables[name];
+  });
+}
+
+const STRIP_TAGS_REGEX = /<\/?\w+\/?>|<\w+[\s|/][^>]*>/gi;
+
+/**
+ * Strip any HTML tag from the string.
+ *
+ * @param  {String} string String to cut HTML from.
+ * @return {String}
+ */
+export function stripTags(string) {
+  string += '';
+
+  return string.replace(STRIP_TAGS_REGEX, '');
 }

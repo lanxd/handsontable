@@ -1,7 +1,6 @@
-
 import {empty, fastInnerText} from './../helpers/dom/element';
 import {stringify} from './../helpers/mixed';
-import {getRenderer, registerRenderer} from './../renderers';
+import {getRenderer} from './index';
 
 /**
  * Default text renderer
@@ -25,7 +24,7 @@ function textRenderer(instance, TD, row, col, prop, value, cellProperties) {
 
   var escaped = stringify(value);
 
-  if(!instance.getSettings().trimWhitespace) {
+  if (!instance.getSettings().trimWhitespace) {
     escaped = escaped.replace(/ /g, String.fromCharCode(160));
   }
 
@@ -37,13 +36,11 @@ function textRenderer(instance, TD, row, col, prop, value, cellProperties) {
     HTMLTemplateElement.decorate(TEMPLATE);
     TEMPLATE.model = instance.getSourceDataAtRow(row);
     TD.appendChild(TEMPLATE);
-  }
-  else {
+
+  } else {
     // this is faster than innerHTML. See: https://github.com/handsontable/handsontable/wiki/JavaScript-&-DOM-performance-tips
     fastInnerText(TD, escaped);
   }
 }
 
-export {textRenderer};
-
-registerRenderer('text', textRenderer);
+export default textRenderer;

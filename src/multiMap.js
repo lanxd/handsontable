@@ -1,17 +1,11 @@
-
-export {MultiMap};
-
-// TODO: Global expose for tests
-window.MultiMap = MultiMap;
-
 function MultiMap() {
   var map = {
     arrayMap: [],
-    weakMap: new WeakMap()
+    weakMap: new WeakMap(),
   };
 
   return {
-    'get': function (key) {
+    get(key) {
       if (canBeAnArrayMapKey(key)) {
         return map.arrayMap[key];
       } else if (canBeAWeakMapKey(key)) {
@@ -19,7 +13,7 @@ function MultiMap() {
       }
     },
 
-    'set': function (key, value) {
+    set(key, value) {
       if (canBeAnArrayMapKey(key)) {
         map.arrayMap[key] = value;
       } else if (canBeAWeakMapKey(key)) {
@@ -27,28 +21,29 @@ function MultiMap() {
       } else {
         throw new Error('Invalid key type');
       }
-
-
     },
 
-    'delete': function (key) {
+    delete(key) {
       if (canBeAnArrayMapKey(key)) {
         delete map.arrayMap[key];
       } else if (canBeAWeakMapKey(key)) {
-        map.weakMap['delete'](key);  //Delete must be called using square bracket notation, because IE8 does not handle using `delete` with dot notation
+        map.weakMap.delete(key);
       }
-    }
+    },
   };
 
-  function canBeAnArrayMapKey(obj){
+  function canBeAnArrayMapKey(obj) {
     return obj !== null && !isNaNSymbol(obj) && (typeof obj == 'string' || typeof obj == 'number');
   }
 
-  function canBeAWeakMapKey(obj){
+  function canBeAWeakMapKey(obj) {
     return obj !== null && (typeof obj == 'object' || typeof obj == 'function');
   }
 
-  function isNaNSymbol(obj){
+  function isNaNSymbol(obj) {
+    /* eslint-disable no-self-compare */
     return obj !== obj; // NaN === NaN is always false
   }
 }
+
+export default MultiMap;

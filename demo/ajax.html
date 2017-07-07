@@ -12,6 +12,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <!--
@@ -127,7 +129,7 @@
                   }
                 });
 
-                Handsontable.Dom.addEvent(load, 'click', function() {
+                Handsontable.dom.addEvent(load, 'click', function() {
                   ajax('json/load.json', 'GET', '', function(res) {
                     var data = JSON.parse(res.response);
 
@@ -136,7 +138,7 @@
                   });
                 });
 
-                Handsontable.Dom.addEvent(save, 'click', function() {
+                Handsontable.dom.addEvent(save, 'click', function() {
                   // save all cell's data
                   ajax('json/save.json', 'GET', JSON.stringify({data: hot.getData()}), function (res) {
                     var response = JSON.parse(res.response);
@@ -150,7 +152,7 @@
                   });
                 });
 
-                Handsontable.Dom.addEvent(autosave, 'click', function() {
+                Handsontable.dom.addEvent(autosave, 'click', function() {
                   if (autosave.checked) {
                     exampleConsole.innerText = 'Changes will be autosaved';
                   }

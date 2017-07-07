@@ -1,7 +1,5 @@
-
-import {getEditor, registerEditor} from './../editors';
-import {AutocompleteEditor} from './autocompleteEditor';
-
+import AutocompleteEditor from './autocompleteEditor';
+import Hooks from './../pluginHooks';
 
 /**
  * @private
@@ -17,6 +15,15 @@ class DropdownEditor extends AutocompleteEditor {
   }
 }
 
-export {DropdownEditor};
+Hooks.getSingleton().add('beforeValidate', function(value, row, col, source) {
+  let cellMeta = this.getCellMeta(row, this.propToCol(col));
 
-registerEditor('dropdown', DropdownEditor);
+  if (cellMeta.editor === DropdownEditor) {
+    if (cellMeta.strict === void 0) {
+      cellMeta.filter = false;
+      cellMeta.strict = true;
+    }
+  }
+});
+
+export default DropdownEditor;

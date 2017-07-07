@@ -1,8 +1,5 @@
-
 import {empty} from './../helpers/dom/element';
-import {getEditor, registerEditor} from './../editors';
-import {TextEditor} from './textEditor';
-
+import TextEditor from './textEditor';
 
 /**
  * @private
@@ -26,6 +23,4 @@ class PasswordEditor extends TextEditor {
   }
 }
 
-export {PasswordEditor};
-
-registerEditor('password', PasswordEditor);
+export default PasswordEditor;

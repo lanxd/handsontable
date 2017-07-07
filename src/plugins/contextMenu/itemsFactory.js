@@ -1,4 +1,3 @@
-
 import {objectEach, isObject, extend} from './../../helpers/object';
 import {arrayEach} from './../../helpers/array';
 import {
@@ -6,7 +5,6 @@ import {
   ITEMS,
   predefinedItems
 } from './predefinedItems';
-
 
 /**
  * Predefined items class factory for menu items.
@@ -24,7 +22,7 @@ class ItemsFactory {
   /**
    * Set predefined items.
    *
-   * @param {Array} predefinedItems
+   * @param {Array} predefinedItems Array of predefined items.
    */
   setPredefinedItems(predefinedItems) {
     let items = {};
@@ -51,25 +49,6 @@ class ItemsFactory {
       this.defaultOrderPattern.push(menuItemKey);
     });
     this.predefinedItems = items;
-  }
-
-  /**
-   * Get only visible menu items based on pattern.
-   *
-   * @param {Array|Object|Boolean} pattern Pattern which you can define by displaying menu items order. If `true` default
-   *                                       pattern will be used.
-   * @returns {Array}
-   */
-  getVisibleItems(pattern = null) {
-    let visibleItems = {};
-
-    objectEach(this.predefinedItems, (value, key) => {
-      if (!value.hidden || value.hidden && !value.hidden.apply(this.hot)) {
-        visibleItems[key] = value;
-      }
-    });
-
-    return getItems(pattern, this.defaultOrderPattern, visibleItems);
   }
 
   /**
@@ -120,7 +99,7 @@ function getItems(pattern = null, defaultPattern = [], items = {}) {
         return;
       }
       if (!item) {
-        item = {name, key: key + ''};
+        item = {name, key: `${key}`};
       }
       if (isObject(name)) {
         extend(item, name);
@@ -131,12 +110,8 @@ function getItems(pattern = null, defaultPattern = [], items = {}) {
       result.push(item);
     });
   }
-  // TODO: Add function which will be cut all separators on the begining
-  if (result[0].name === SEPARATOR) {
-    result.shift();
-  }
 
   return result;
 }
 
-export {ItemsFactory};
+export default ItemsFactory;

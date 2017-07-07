@@ -1,29 +1,25 @@
-
-import {WalkontableCellCoords} from './3rdparty/walkontable/src/cell/coords';
+import {CellCoords} from './3rdparty/walkontable/src';
 import {KEY_CODES, isMetaKey, isCtrlKey} from './helpers/unicode';
 import {stopPropagation, stopImmediatePropagation, isImmediatePropagationStopped} from './helpers/dom/event';
-import {getEditor} from './editors';
-import {eventManager as eventManagerObject} from './eventManager';
+import {getEditorInstance} from './editors';
+import EventManager from './eventManager';
+import {EditorState} from './editors/_baseEditor';
 
-export {EditorManager};
-
-// support for older versions of Handsontable
-Handsontable.EditorManager = EditorManager;
-
-function EditorManager(instance, priv, selection){
+function EditorManager(instance, priv, selection) {
   var _this = this,
     destroyed = false,
     eventManager,
     activeEditor;
 
-  eventManager = eventManagerObject(instance);
+  eventManager = new EventManager(instance);
 
   function moveSelectionAfterEnter(shiftKey) {
+    selection.setSelectedHeaders(false, false, false);
     var enterMoves = typeof priv.settings.enterMoves === 'function' ? priv.settings.enterMoves(event) : priv.settings.enterMoves;
 
     if (shiftKey) {
       // move selection up
-      selection.transformStart(-enterMoves.row, - enterMoves.col);
+      selection.transformStart(-enterMoves.row, -enterMoves.col);
 
     } else {
       // move selection down (add a new row if needed)
@@ -33,8 +29,13 @@ function EditorManager(instance, priv, selection){
 
   function moveSelectionUp(shiftKey) {
     if (shiftKey) {
+      if (selection.selectedHeader.cols) {
+        selection.setSelectedHeaders(selection.selectedHeader.rows, false, false);
+      }
       selection.transformEnd(-1, 0);
+
     } else {
+      selection.setSelectedHeaders(false, false, false);
       selection.transformStart(-1, 0);
     }
   }
@@ -44,7 +45,7 @@ function EditorManager(instance, priv, selection){
       // expanding selection down with shift
       selection.transformEnd(1, 0);
     } else {
-      // move selection down
+      selection.setSelectedHeaders(false, false, false);
       selection.transformStart(1, 0);
     }
   }
@@ -53,25 +54,32 @@ function EditorManager(instance, priv, selection){
     if (shiftKey) {
       selection.transformEnd(0, 1);
     } else {
+      selection.setSelectedHeaders(false, false, false);
       selection.transformStart(0, 1);
     }
   }
 
   function moveSelectionLeft(shiftKey) {
     if (shiftKey) {
-      selection.transformEnd(0, - 1);
+      if (selection.selectedHeader.rows) {
+        selection.setSelectedHeaders(false, selection.selectedHeader.cols, false);
+      }
+      selection.transformEnd(0, -1);
+
     } else {
-      selection.transformStart(0, - 1);
+      selection.setSelectedHeaders(false, false, false);
+      selection.transformStart(0, -1);
     }
   }
 
   function onKeyDown(event) {
-    var ctrlDown, rangeModifier;
+    var ctrlDown,
+      rangeModifier;
 
     if (!instance.isListening()) {
       return;
     }
-    Handsontable.hooks.run(instance, 'beforeKeyDown', event);
+    instance.runHooks('beforeKeyDown', event);
 
     if (destroyed) {
       return;
@@ -89,7 +97,7 @@ function EditorManager(instance, priv, selection){
 
     if (activeEditor && !activeEditor.isWaiting()) {
       if (!isMetaKey(event.keyCode) && !isCtrlKey(event.keyCode) && !ctrlDown && !_this.isEditorOpened()) {
-        _this.openEditor("", event);
+        _this.openEditor('', event);
 
         return;
       }
@@ -97,7 +105,6 @@ function EditorManager(instance, priv, selection){
     rangeModifier = event.shiftKey ? selection.setRangeEnd : selection.setRangeStart;
 
     switch (event.keyCode) {
-
       case KEY_CODES.A:
         if (!_this.isEditorOpened() && ctrlDown) {
           selection.selectAll();
@@ -121,6 +128,7 @@ function EditorManager(instance, priv, selection){
         if (_this.isEditorOpened() && !activeEditor.isWaiting()) {
           _this.closeEditorAndSaveChanges(ctrlDown);
         }
+
         moveSelectionDown(event.shiftKey);
 
         event.preventDefault();
@@ -131,6 +139,7 @@ function EditorManager(instance, priv, selection){
         if (_this.isEditorOpened() && !activeEditor.isWaiting()) {
           _this.closeEditorAndSaveChanges(ctrlDown);
         }
+
         moveSelectionRight(event.shiftKey);
 
         event.preventDefault();
@@ -141,6 +150,7 @@ function EditorManager(instance, priv, selection){
         if (_this.isEditorOpened() && !activeEditor.isWaiting()) {
           _this.closeEditorAndSaveChanges(ctrlDown);
         }
+
         moveSelectionLeft(event.shiftKey);
 
         event.preventDefault();
@@ -148,6 +158,7 @@ function EditorManager(instance, priv, selection){
         break;
 
       case KEY_CODES.TAB:
+        selection.setSelectedHeaders(false, false, false);
         var tabMoves = typeof priv.settings.tabMoves === 'function' ? priv.settings.tabMoves(event) : priv.settings.tabMoves;
 
         if (event.shiftKey) {
@@ -175,31 +186,29 @@ function EditorManager(instance, priv, selection){
         if (activeEditor) {
           activeEditor.enableFullEditMode();
         }
-        event.preventDefault(); //prevent Opera from opening 'Go to Page dialog'
+        event.preventDefault(); // prevent Opera from opening 'Go to Page dialog'
         break;
 
       case KEY_CODES.ENTER:
         /* return/enter */
         if (_this.isEditorOpened()) {
 
-          if (activeEditor && activeEditor.state !== Handsontable.EditorState.WAITING) {
+          if (activeEditor && activeEditor.state !== EditorState.WAITING) {
             _this.closeEditorAndSaveChanges(ctrlDown);
           }
           moveSelectionAfterEnter(event.shiftKey);
 
-        } else {
-          if (instance.getSettings().enterBeginsEditing) {
-            _this.openEditor(null, event);
+        } else if (instance.getSettings().enterBeginsEditing) {
+          _this.openEditor(null, event);
 
-            if (activeEditor) {
-              activeEditor.enableFullEditMode();
-            }
-          } else {
-            moveSelectionAfterEnter(event.shiftKey);
+          if (activeEditor) {
+            activeEditor.enableFullEditMode();
           }
+        } else {
+          moveSelectionAfterEnter(event.shiftKey);
         }
-        event.preventDefault(); //don't add newline to field
-        stopImmediatePropagation(event); //required by HandsontableEditor
+        event.preventDefault(); // don't add newline to field
+        stopImmediatePropagation(event); // required by HandsontableEditor
         break;
 
       case KEY_CODES.ESCAPE:
@@ -210,35 +219,41 @@ function EditorManager(instance, priv, selection){
         break;
 
       case KEY_CODES.HOME:
+        selection.setSelectedHeaders(false, false, false);
         if (event.ctrlKey || event.metaKey) {
-          rangeModifier(new WalkontableCellCoords(0, priv.selRange.from.col));
+          rangeModifier(new CellCoords(0, priv.selRange.from.col));
         } else {
-          rangeModifier(new WalkontableCellCoords(priv.selRange.from.row, 0));
+          rangeModifier(new CellCoords(priv.selRange.from.row, 0));
         }
-        event.preventDefault(); //don't scroll the window
+        event.preventDefault(); // don't scroll the window
         stopPropagation(event);
         break;
 
       case KEY_CODES.END:
+        selection.setSelectedHeaders(false, false, false);
         if (event.ctrlKey || event.metaKey) {
-          rangeModifier(new WalkontableCellCoords(instance.countRows() - 1, priv.selRange.from.col));
+          rangeModifier(new CellCoords(instance.countRows() - 1, priv.selRange.from.col));
         } else {
-          rangeModifier(new WalkontableCellCoords(priv.selRange.from.row, instance.countCols() - 1));
+          rangeModifier(new CellCoords(priv.selRange.from.row, instance.countCols() - 1));
         }
-        event.preventDefault(); //don't scroll the window
+        event.preventDefault(); // don't scroll the window
         stopPropagation(event);
         break;
 
       case KEY_CODES.PAGE_UP:
+        selection.setSelectedHeaders(false, false, false);
         selection.transformStart(-instance.countVisibleRows(), 0);
-        event.preventDefault(); //don't page up the window
+        event.preventDefault(); // don't page up the window
         stopPropagation(event);
         break;
 
       case KEY_CODES.PAGE_DOWN:
+        selection.setSelectedHeaders(false, false, false);
         selection.transformStart(instance.countVisibleRows(), 0);
-        event.preventDefault(); //don't page down the window
+        event.preventDefault(); // don't page down the window
         stopPropagation(event);
+        break;
+      default:
         break;
     }
   }
@@ -246,13 +261,15 @@ function EditorManager(instance, priv, selection){
   function init() {
     instance.addHook('afterDocumentKeyDown', onKeyDown);
 
-    eventManager.addEventListener(document.documentElement, 'keydown', function(event) {
-      instance.runHooks('afterDocumentKeyDown', event);
+    eventManager.addEventListener(document.documentElement, 'keydown', (event) => {
+      if (!destroyed) {
+        instance.runHooks('afterDocumentKeyDown', event);
+      }
     });
 
     function onDblClick(event, coords, elem) {
       // may be TD or TH
-      if (elem.nodeName == "TD") {
+      if (elem.nodeName == 'TD') {
         _this.openEditor();
 
         if (activeEditor) {
@@ -262,7 +279,7 @@ function EditorManager(instance, priv, selection){
     }
     instance.view.wt.update('onCellDblClick', onDblClick);
 
-    instance.addHook('afterDestroy', function() {
+    instance.addHook('afterDestroy', () => {
       destroyed = true;
     });
   }
@@ -296,10 +313,16 @@ function EditorManager(instance, priv, selection){
    * @memberof! Handsontable.EditorManager#
    */
   this.prepareEditor = function() {
-    var row, col, prop, td, originalValue, cellProperties, editorClass;
+    var row,
+      col,
+      prop,
+      td,
+      originalValue,
+      cellProperties,
+      editorClass;
 
     if (activeEditor && activeEditor.isWaiting()) {
-      this.closeEditor(false, false, function(dataSaved) {
+      this.closeEditor(false, false, (dataSaved) => {
         if (dataSaved) {
           _this.prepareEditor();
         }
@@ -311,12 +334,13 @@ function EditorManager(instance, priv, selection){
     col = priv.selRange.highlight.col;
     prop = instance.colToProp(col);
     td = instance.getCell(row, col);
-    originalValue = instance.getDataAtCell(row, col);
+
+    originalValue = instance.getSourceDataAtCell(instance.runHooks('modifyRow', row), col);
     cellProperties = instance.getCellMeta(row, col);
     editorClass = instance.getCellEditor(cellProperties);
 
     if (editorClass) {
-      activeEditor = Handsontable.editors.getEditor(editorClass, instance);
+      activeEditor = getEditorInstance(editorClass, instance);
       activeEditor.prepare(row, col, prop, td, originalValue, cellProperties);
 
     } else {
@@ -343,7 +367,7 @@ function EditorManager(instance, priv, selection){
    * @param {String} initialValue
    * @param {DOMEvent} event
    */
-  this.openEditor = function (initialValue, event) {
+  this.openEditor = function(initialValue, event) {
     if (activeEditor && !activeEditor.cellProperties.readOnly) {
       activeEditor.beginEditing(initialValue, event);
     } else if (activeEditor && activeEditor.cellProperties.readOnly) {
@@ -365,12 +389,11 @@ function EditorManager(instance, priv, selection){
    * @param {Function} [callback]
    */
   this.closeEditor = function(restoreOriginalValue, ctrlDown, callback) {
-    if (!activeEditor) {
-      if (callback) {
-        callback(false);
-      }
-    } else {
+    if (activeEditor) {
       activeEditor.finishEditing(restoreOriginalValue, ctrlDown, callback);
+
+    } else if (callback) {
+      callback(false);
     }
   };
 
@@ -398,3 +421,5 @@ function EditorManager(instance, priv, selection){
 
   init();
 }
+
+export default EditorManager;

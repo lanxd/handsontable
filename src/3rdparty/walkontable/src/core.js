@@ -1,19 +1,17 @@
-
 import {
   addClass,
   fastInnerText,
   isVisible,
   removeClass,
-    } from './../../../helpers/dom/element';
+} from './../../../helpers/dom/element';
 import {objectEach} from './../../../helpers/object';
 import {toUpperCaseFirst, randomString} from './../../../helpers/string';
-import {WalkontableEvent} from './event';
-import {WalkontableOverlays} from './overlays';
-import {WalkontableScroll} from './scroll';
-import {WalkontableSettings} from './settings';
-import {WalkontableTable} from './table';
-import {WalkontableViewport} from './viewport';
-
+import Event from './event';
+import Overlays from './overlays';
+import Scroll from './scroll';
+import Settings from './settings';
+import Table from './table';
+import Viewport from './viewport';
 
 /**
  * @class Walkontable
@@ -26,26 +24,26 @@ class Walkontable {
     let originalHeaders = [];
 
     // this is the namespace for global events
-    this.guid = 'wt_' + randomString();
+    this.guid = `wt_${randomString()}`;
 
     // bootstrap from settings
     if (settings.cloneSource) {
       this.cloneSource = settings.cloneSource;
       this.cloneOverlay = settings.cloneOverlay;
       this.wtSettings = settings.cloneSource.wtSettings;
-      this.wtTable = new WalkontableTable(this, settings.table, settings.wtRootElement);
-      this.wtScroll = new WalkontableScroll(this);
+      this.wtTable = new Table(this, settings.table, settings.wtRootElement);
+      this.wtScroll = new Scroll(this);
       this.wtViewport = settings.cloneSource.wtViewport;
-      this.wtEvent = new WalkontableEvent(this);
+      this.wtEvent = new Event(this);
       this.selections = this.cloneSource.selections;
     } else {
-      this.wtSettings = new WalkontableSettings(this, settings);
-      this.wtTable = new WalkontableTable(this, settings.table);
-      this.wtScroll = new WalkontableScroll(this);
-      this.wtViewport = new WalkontableViewport(this);
-      this.wtEvent = new WalkontableEvent(this);
+      this.wtSettings = new Settings(this, settings);
+      this.wtTable = new Table(this, settings.table);
+      this.wtScroll = new Scroll(this);
+      this.wtViewport = new Viewport(this);
+      this.wtEvent = new Event(this);
       this.selections = this.getSetting('selections');
-      this.wtOverlays = new WalkontableOverlays(this);
+      this.wtOverlays = new Overlays(this);
       this.exportSettingsAsClassNames();
     }
 
@@ -70,7 +68,7 @@ class Walkontable {
    * Force rerender of Walkontable
    *
    * @param {Boolean} [fastDraw=false] When `true`, try to refresh only the positions of borders without rerendering
-   *                                   the data. It will only work if WalkontableTable.draw() does not force
+   *                                   the data. It will only work if Table.draw() does not force
    *                                   rendering anyway
    * @returns {Walkontable}
    */
@@ -91,7 +89,7 @@ class Walkontable {
    * Returns the TD at coords. If topmost is set to true, returns TD from the topmost overlay layer,
    * if not set or set to false, returns TD from the master table.
    *
-   * @param {WalkontableCellCoords} coords
+   * @param {CellCoords} coords
    * @param {Boolean} [topmost=false]
    * @returns {Object}
    */
@@ -100,17 +98,30 @@ class Walkontable {
       return this.wtTable.getCell(coords);
     }
 
-    let fixedRows = this.wtSettings.getSetting('fixedRowsTop');
+    let totalRows = this.wtSettings.getSetting('totalRows');
+    let fixedRowsTop = this.wtSettings.getSetting('fixedRowsTop');
+    let fixedRowsBottom = this.wtSettings.getSetting('fixedRowsBottom');
     let fixedColumns = this.wtSettings.getSetting('fixedColumnsLeft');
 
-    if (coords.row < fixedRows && coords.col < fixedColumns) {
+    if (coords.row < fixedRowsTop && coords.col < fixedColumns) {
       return this.wtOverlays.topLeftCornerOverlay.clone.wtTable.getCell(coords);
 
-    } else if (coords.row < fixedRows) {
+    } else if (coords.row < fixedRowsTop) {
       return this.wtOverlays.topOverlay.clone.wtTable.getCell(coords);
+
+    } else if (coords.col < fixedColumns && coords.row >= totalRows - fixedRowsBottom) {
+      if (this.wtOverlays.bottomLeftCornerOverlay && this.wtOverlays.bottomLeftCornerOverlay.clone) {
+        return this.wtOverlays.bottomLeftCornerOverlay.clone.wtTable.getCell(coords);
+      }
 
     } else if (coords.col < fixedColumns) {
       return this.wtOverlays.leftOverlay.clone.wtTable.getCell(coords);
+
+    } else if (coords.row < totalRows && coords.row > totalRows - fixedRowsBottom) {
+      if (this.wtOverlays.bottomOverlay && this.wtOverlays.bottomOverlay.clone) {
+        return this.wtOverlays.bottomOverlay.clone.wtTable.getCell(coords);
+      }
+
     }
 
     return this.wtTable.getCell(coords);
@@ -154,7 +165,7 @@ class Walkontable {
   /**
    * Scrolls the viewport to a cell (rerenders if needed)
    *
-   * @param {WalkontableCellCoords} coords
+   * @param {CellCoords} coords
    * @returns {Walkontable}
    */
   scrollViewport(coords) {
@@ -185,6 +196,20 @@ class Walkontable {
   }
 
   /**
+   * Check overlay type of this Walkontable instance.
+   *
+   * @param {String} name Clone type @see {Overlay.CLONE_TYPES}.
+   * @returns {Boolean}
+   */
+  isOverlayName(name) {
+    if (this.cloneOverlay) {
+      return this.cloneOverlay.type === name;
+    }
+
+    return false;
+  }
+
+  /**
    * Export settings as class names added to the parent element of the table.
    */
   exportSettingsAsClassNames() {
@@ -197,9 +222,9 @@ class Walkontable {
 
     objectEach(toExport, (optionType, key) => {
       if (optionType.indexOf('array') > -1 && this.getSetting(key).length) {
-        newClassNames.push('ht' + toUpperCaseFirst(key));
+        newClassNames.push(`ht${toUpperCaseFirst(key)}`);
       }
-      allClassNames.push('ht' + toUpperCaseFirst(key));
+      allClassNames.push(`ht${toUpperCaseFirst(key)}`);
     });
     removeClass(this.wtTable.wtRootElement.parentNode, allClassNames);
     addClass(this.wtTable.wtRootElement.parentNode, newClassNames);
@@ -239,6 +264,4 @@ class Walkontable {
   }
 }
 
-export {Walkontable};
-
-window.Walkontable = Walkontable;
+export default Walkontable;

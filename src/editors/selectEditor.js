@@ -1,4 +1,3 @@
-
 import {
   addClass,
   empty,
@@ -10,14 +9,12 @@ import {
   outerHeight,
   outerWidth,
   resetCssTransform,
-    } from './../helpers/dom/element';
+} from './../helpers/dom/element';
 import {stopImmediatePropagation} from './../helpers/dom/event';
 import {KEY_CODES} from './../helpers/unicode';
-import {getEditor, registerEditor} from './../editors';
-import {BaseEditor} from './_baseEditor';
+import BaseEditor, {EditorState} from './_baseEditor';
 
-var SelectEditor = BaseEditor.prototype.extend();
-
+const SelectEditor = BaseEditor.prototype.extend();
 
 /**
  * @private
@@ -33,6 +30,7 @@ SelectEditor.prototype.init = function() {
 };
 
 SelectEditor.prototype.registerHooks = function() {
+  this.instance.addHook('afterScrollHorizontally', () => this.refreshDimensions());
   this.instance.addHook('afterScrollVertically', () => this.refreshDimensions());
   this.instance.addHook('afterColumnResize', () => this.refreshDimensions());
   this.instance.addHook('afterRowResize', () => this.refreshDimensions());
@@ -53,7 +51,7 @@ SelectEditor.prototype.prepare = function() {
   empty(this.select);
 
   for (var option in options) {
-    if (options.hasOwnProperty(option)) {
+    if (Object.prototype.hasOwnProperty.call(options, option)) {
       var optionElement = document.createElement('OPTION');
       optionElement.value = option;
       fastInnerHTML(optionElement, options[option]);
@@ -109,21 +107,8 @@ var onBeforeKeyDown = function(event) {
       stopImmediatePropagation(event);
       event.preventDefault();
       break;
-  }
-};
-
-// TODO: Refactor this with the use of new getCell() after 0.12.1
-SelectEditor.prototype.checkEditorSection = function() {
-  if (this.row < this.instance.getSettings().fixedRowsTop) {
-    if (this.col < this.instance.getSettings().fixedColumnsLeft) {
-      return 'corner';
-    } else {
-      return 'top';
-    }
-  } else {
-    if (this.col < this.instance.getSettings().fixedColumnsLeft) {
-      return 'left';
-    }
+    default:
+      break;
   }
 };
 
@@ -144,8 +129,16 @@ SelectEditor.prototype.focus = function() {
   this.select.focus();
 };
 
+SelectEditor.prototype.refreshValue = function() {
+  let sourceData = this.instance.getSourceDataAtCell(this.row, this.prop);
+  this.originalValue = sourceData;
+
+  this.setValue(sourceData);
+  this.refreshDimensions();
+};
+
 SelectEditor.prototype.refreshDimensions = function() {
-  if (this.state !== Handsontable.EditorState.EDITING) {
+  if (this.state !== EditorState.EDITING) {
     return;
   }
   this.TD = this.getEditedCell();
@@ -178,8 +171,16 @@ SelectEditor.prototype.refreshDimensions = function() {
     case 'left':
       cssTransformOffset = getCssTransform(this.instance.view.wt.wtOverlays.leftOverlay.clone.wtTable.holder.parentNode);
       break;
-    case 'corner':
+    case 'top-left-corner':
       cssTransformOffset = getCssTransform(this.instance.view.wt.wtOverlays.topLeftCornerOverlay.clone.wtTable.holder.parentNode);
+      break;
+    case 'bottom-left-corner':
+      cssTransformOffset = getCssTransform(this.instance.view.wt.wtOverlays.bottomLeftCornerOverlay.clone.wtTable.holder.parentNode);
+      break;
+    case 'bottom':
+      cssTransformOffset = getCssTransform(this.instance.view.wt.wtOverlays.bottomOverlay.clone.wtTable.holder.parentNode);
+      break;
+    default:
       break;
   }
   if (this.instance.getSelected()[0] === 0) {
@@ -206,10 +207,10 @@ SelectEditor.prototype.refreshDimensions = function() {
     width -= 1;
   }
 
-  selectStyle.height = height + 'px';
-  selectStyle.minWidth = width + 'px';
-  selectStyle.top = editTop + 'px';
-  selectStyle.left = editLeft + 'px';
+  selectStyle.height = `${height}px`;
+  selectStyle.minWidth = `${width}px`;
+  selectStyle.top = `${editTop}px`;
+  selectStyle.left = `${editLeft}px`;
   selectStyle.margin = '0px';
 };
 
@@ -248,7 +249,4 @@ SelectEditor.prototype.getEditedCell = function() {
   return editedCell != -1 && editedCell != -2 ? editedCell : void 0;
 };
 
-export {SelectEditor};
-
-registerEditor('select', SelectEditor);
-
+export default SelectEditor;

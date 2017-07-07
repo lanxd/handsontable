@@ -1,4 +1,3 @@
-
 import {
   getScrollbarWidth,
   getScrollTop,
@@ -6,28 +5,27 @@ import {
   offset,
   outerHeight,
   outerWidth,
-    } from './../../../helpers/dom/element';
-import {EventManager} from './../../../eventManager';
-import {WalkontableViewportColumnsCalculator} from './calculator/viewportColumns';
-import {WalkontableViewportRowsCalculator} from './calculator/viewportRows';
-
+} from './../../../helpers/dom/element';
+import {objectEach} from './../../../helpers/object';
+import EventManager from './../../../eventManager';
+import ViewportColumnsCalculator from './calculator/viewportColumns';
+import ViewportRowsCalculator from './calculator/viewportRows';
 
 /**
- * @class WalkontableViewport
+ * @class Viewport
  */
-class WalkontableViewport {
+class Viewport {
   /**
    * @param wotInstance
    */
   constructor(wotInstance) {
     this.wot = wotInstance;
-
     // legacy support
     this.instance = this.wot;
 
     this.oversizedRows = [];
     this.oversizedColumnHeaders = [];
-    this.isMarkedOversizedColumn = {};
+    this.hasOversizedColumnHeadersMarked = {};
     this.clientHeight = 0;
     this.containerWidth = NaN;
     this.rowHeaderWidth = NaN;
@@ -44,7 +42,6 @@ class WalkontableViewport {
    * @returns {number}
    */
   getWorkspaceHeight() {
-    // var scrollHandler = this.instance.wtOverlays.topOverlay.scrollHandler;
     let trimmingContainer = this.instance.wtOverlays.topOverlay.trimmingContainer;
     let elemHeight;
     let height = 0;
@@ -63,13 +60,18 @@ class WalkontableViewport {
 
   getWorkspaceWidth() {
     let width;
-    let totalColumns = this.instance.getSetting("totalColumns");
+    let totalColumns = this.wot.getSetting('totalColumns');
     let trimmingContainer = this.instance.wtOverlays.leftOverlay.trimmingContainer;
     let overflow;
-    let stretchSetting = this.instance.getSetting('stretchH');
+    let stretchSetting = this.wot.getSetting('stretchH');
     let docOffsetWidth = document.documentElement.offsetWidth;
+    let preventOverflow = this.wot.getSetting('preventOverflow');
 
-    if (Handsontable.freezeOverlays) {
+    if (preventOverflow) {
+      return outerWidth(this.instance.wtTable.wtRootElement);
+    }
+
+    if (this.wot.getSetting('freezeOverlays')) {
       width = Math.min(docOffsetWidth - this.getWorkspaceOffset().left, docOffsetWidth);
     } else {
       width = Math.min(this.getContainerFillWidth(), docOffsetWidth - this.getWorkspaceOffset().left, docOffsetWidth);
@@ -86,7 +88,7 @@ class WalkontableViewport {
     if (trimmingContainer !== window) {
       overflow = getStyle(this.instance.wtOverlays.leftOverlay.trimmingContainer, 'overflow');
 
-      if (overflow == "scroll" || overflow == "hidden" || overflow == "auto") {
+      if (overflow == 'scroll' || overflow == 'hidden' || overflow == 'auto') {
         // this is used in `scroll.html`
         // TODO test me
         return Math.max(width, trimmingContainer.clientWidth);
@@ -96,10 +98,10 @@ class WalkontableViewport {
     if (stretchSetting === 'none' || !stretchSetting) {
       // if no stretching is used, return the maximum used workspace width
       return Math.max(width, outerWidth(this.instance.wtTable.TABLE));
-    } else {
-      // if stretching is used, return the actual container width, so the columns can fit inside it
-      return width;
     }
+      // if stretching is used, return the actual container width, so the columns can fit inside it
+    return width;
+
   }
 
   /**
@@ -130,7 +132,7 @@ class WalkontableViewport {
 
     while (from < length) {
       sum += this.wot.wtTable.getColumnWidth(from);
-      from ++;
+      from++;
     }
 
     return sum;
@@ -147,9 +149,9 @@ class WalkontableViewport {
     let fillWidth;
     let dummyElement;
 
-    dummyElement = document.createElement("DIV");
-    dummyElement.style.width = "100%";
-    dummyElement.style.height = "1px";
+    dummyElement = document.createElement('div');
+    dummyElement.style.width = '100%';
+    dummyElement.style.height = '1px';
     mainContainer.appendChild(dummyElement);
     fillWidth = dummyElement.offsetWidth;
 
@@ -179,7 +181,7 @@ class WalkontableViewport {
   getWorkspaceActualWidth() {
     return outerWidth(this.wot.wtTable.TABLE) ||
       outerWidth(this.wot.wtTable.TBODY) ||
-      outerWidth(this.wot.wtTable.THEAD); //IE8 reports 0 as <table> offsetWidth;
+      outerWidth(this.wot.wtTable.THEAD); // IE8 reports 0 as <table> offsetWidth;
   }
 
   /**
@@ -216,11 +218,22 @@ class WalkontableViewport {
    * @returns {Number}
    */
   getRowHeaderWidth() {
+    let rowHeadersHeightSetting = this.instance.getSetting('rowHeaderWidth');
+    let rowHeaders = this.instance.getSetting('rowHeaders');
+
+    if (rowHeadersHeightSetting) {
+      this.rowHeaderWidth = 0;
+
+      for (let i = 0, len = rowHeaders.length; i < len; i++) {
+        this.rowHeaderWidth += rowHeadersHeightSetting[i] || rowHeadersHeightSetting;
+      }
+    }
+
     if (this.wot.cloneSource) {
       return this.wot.cloneSource.wtViewport.getRowHeaderWidth();
     }
+
     if (isNaN(this.rowHeaderWidth)) {
-      let rowHeaders = this.instance.getSetting('rowHeaders');
 
       if (rowHeaders.length) {
         let TH = this.instance.wtTable.TABLE.querySelector('TH');
@@ -241,6 +254,8 @@ class WalkontableViewport {
         this.rowHeaderWidth = 0;
       }
     }
+
+    this.rowHeaderWidth = this.instance.getSetting('onModifyRowHeaderWidth', this.rowHeaderWidth) || this.rowHeaderWidth;
 
     return this.rowHeaderWidth;
   }
@@ -269,12 +284,16 @@ class WalkontableViewport {
    *  - rowsRenderCalculator (before draw, to qualify rows for rendering)
    *  - rowsVisibleCalculator (after draw, to measure which rows are actually visible)
    *
-   * @returns {WalkontableViewportRowsCalculator}
+   * @returns {ViewportRowsCalculator}
    */
   createRowsCalculator(visible = false) {
     let height;
     let pos;
     let fixedRowsTop;
+    let scrollbarHeight;
+    let fixedRowsBottom;
+    let fixedRowsHeight;
+    let totalRows;
 
     this.rowHeaderWidth = NaN;
 
@@ -283,28 +302,41 @@ class WalkontableViewport {
     } else {
       height = this.getViewportHeight();
     }
-    pos = getScrollTop(this.wot.wtOverlays.mainTableScrollableElement) - this.wot.wtOverlays.topOverlay.getTableParentOffset();
+    pos = this.wot.wtOverlays.topOverlay.getScrollPosition() - this.wot.wtOverlays.topOverlay.getTableParentOffset();
 
     if (pos < 0) {
       pos = 0;
     }
     fixedRowsTop = this.wot.getSetting('fixedRowsTop');
+    fixedRowsBottom = this.wot.getSetting('fixedRowsBottom');
+    totalRows = this.wot.getSetting('totalRows');
 
     if (fixedRowsTop) {
-      let fixedRowsHeight = this.wot.wtOverlays.topOverlay.sumCellSizes(0, fixedRowsTop);
+      fixedRowsHeight = this.wot.wtOverlays.topOverlay.sumCellSizes(0, fixedRowsTop);
       pos += fixedRowsHeight;
       height -= fixedRowsHeight;
     }
 
-    return new WalkontableViewportRowsCalculator(
+    if (fixedRowsBottom && this.wot.wtOverlays.bottomOverlay.clone) {
+      fixedRowsHeight = this.wot.wtOverlays.bottomOverlay.sumCellSizes(totalRows - fixedRowsBottom, totalRows);
+
+      height -= fixedRowsHeight;
+    }
+
+    if (this.wot.wtTable.holder.clientHeight === this.wot.wtTable.holder.offsetHeight) {
+      scrollbarHeight = 0;
+    } else {
+      scrollbarHeight = getScrollbarWidth();
+    }
+
+    return new ViewportRowsCalculator(
       height,
       pos,
       this.wot.getSetting('totalRows'),
-      (sourceRow) => {
-        return this.wot.wtTable.getRowHeight(sourceRow);
-      },
+      (sourceRow) => this.wot.wtTable.getRowHeight(sourceRow),
       visible ? null : this.wot.wtSettings.settings.viewportRowCalculatorOverride,
-      visible
+      visible,
+      scrollbarHeight
     );
   }
 
@@ -313,7 +345,7 @@ class WalkontableViewport {
    *  - columnsRenderCalculator (before draw, to qualify columns for rendering)
    *  - columnsVisibleCalculator (after draw, to measure which columns are actually visible)
    *
-   * @returns {WalkontableViewportRowsCalculator}
+   * @returns {ViewportRowsCalculator}
    */
   createColumnsCalculator(visible = false) {
     let width = this.getViewportWidth();
@@ -338,16 +370,15 @@ class WalkontableViewport {
       width -= getScrollbarWidth();
     }
 
-    return new WalkontableViewportColumnsCalculator(
+    return new ViewportColumnsCalculator(
       width,
       pos,
       this.wot.getSetting('totalColumns'),
-      (sourceCol) => {
-        return this.wot.wtTable.getColumnWidth(sourceCol);
-      },
+      (sourceCol) => this.wot.wtTable.getColumnWidth(sourceCol),
       visible ? null : this.wot.wtSettings.settings.viewportColumnCalculatorOverride,
       visible,
-      this.wot.getSetting('stretchH')
+      this.wot.getSetting('stretchH'),
+      (stretchedWidth, column) => this.wot.getSetting('onBeforeStretchingColumnWidth', stretchedWidth, column)
     );
   }
 
@@ -410,9 +441,9 @@ class WalkontableViewport {
           proposedRowsVisibleCalculator.endRow < this.wot.getSetting('totalRows') - 1)) {
         return false;
 
-      } else {
-        return true;
       }
+      return true;
+
     }
 
     return false;
@@ -438,15 +469,22 @@ class WalkontableViewport {
           proposedColumnsVisibleCalculator.endColumn < this.wot.getSetting('totalColumns') - 1)) {
         return false;
 
-      } else {
-        return true;
       }
+      return true;
+
     }
 
     return false;
   }
+
+  /**
+   * Resets values in keys of the hasOversizedColumnHeadersMarked object after updateSettings.
+   */
+  resetHasOversizedColumnHeadersMarked() {
+    objectEach(this.hasOversizedColumnHeadersMarked, (value, key, object) => {
+      object[key] = void 0;
+    });
+  }
 }
 
-export {WalkontableViewport};
-
-window.WalkontableViewport = WalkontableViewport;
+export default Viewport;

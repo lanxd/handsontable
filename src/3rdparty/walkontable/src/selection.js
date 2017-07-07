@@ -1,17 +1,15 @@
-
 import {addClass} from './../../../helpers/dom/element';
-import {WalkontableBorder} from './border';
-import {WalkontableCellCoords} from './cell/coords';
-import {WalkontableCellRange} from './cell/range';
-
+import Border from './border';
+import CellCoords from './cell/coords';
+import CellRange from './cell/range';
 
 /**
- * @class WalkontableSelection
+ * @class Selection
  */
-class WalkontableSelection {
+class Selection {
   /**
    * @param {Object} settings
-   * @param {WalkontableCellRange} cellRange
+   * @param {CellRange} cellRange
    */
   constructor(settings, cellRange) {
     this.settings = settings;
@@ -24,14 +22,15 @@ class WalkontableSelection {
    * borders per instance
    *
    * @param {Walkontable} wotInstance
-   * @returns {WalkontableBorder}
+   * @returns {Border}
    */
   getBorder(wotInstance) {
     if (this.instanceBorders[wotInstance.guid]) {
       return this.instanceBorders[wotInstance.guid];
     }
+
     // where is this returned?
-    this.instanceBorders[wotInstance.guid] = new WalkontableBorder(wotInstance, this.settings);
+    this.instanceBorders[wotInstance.guid] = new Border(wotInstance, this.settings);
   }
 
   /**
@@ -46,11 +45,11 @@ class WalkontableSelection {
   /**
    * Adds a cell coords to the selection
    *
-   * @param {WalkontableCellCoords} coords
+   * @param {CellCoords} coords
    */
   add(coords) {
     if (this.isEmpty()) {
-      this.cellRange = new WalkontableCellRange(coords, coords, coords);
+      this.cellRange = new CellRange(coords, coords, coords);
 
     } else {
       this.cellRange.expand(coords);
@@ -61,8 +60,8 @@ class WalkontableSelection {
    * If selection range from or to property equals oldCoords, replace it with newCoords. Return boolean
    * information about success
    *
-   * @param {WalkontableCellCoords} oldCoords
-   * @param {WalkontableCellCoords} newCoords
+   * @param {CellCoords} oldCoords
+   * @param {CellCoords} newCoords
    * @returns {Boolean}
    */
   replace(oldCoords, newCoords) {
@@ -102,7 +101,7 @@ class WalkontableSelection {
       topLeft.row,
       topLeft.col,
       bottomRight.row,
-      bottomRight.col
+      bottomRight.col,
     ];
   }
 
@@ -115,7 +114,7 @@ class WalkontableSelection {
    * @param {String} className Class name
    */
   addClassAtCoords(wotInstance, sourceRow, sourceColumn, className) {
-    let TD = wotInstance.wtTable.getCell(new WalkontableCellCoords(sourceRow, sourceColumn));
+    let TD = wotInstance.wtTable.getCell(new CellCoords(sourceRow, sourceColumn));
 
     if (typeof TD === 'object') {
       addClass(TD, className);
@@ -140,7 +139,9 @@ class WalkontableSelection {
     let renderedRows = wotInstance.wtTable.getRenderedRowsCount();
     let renderedColumns = wotInstance.wtTable.getRenderedColumnsCount();
     let corners = this.getCorners();
-    let sourceRow, sourceCol, TH;
+    let sourceRow,
+      sourceCol,
+      TH;
 
     for (let column = 0; column < renderedColumns; column++) {
       sourceCol = wotInstance.wtTable.columnFilter.renderedToSource(column);
@@ -148,8 +149,18 @@ class WalkontableSelection {
       if (sourceCol >= corners[1] && sourceCol <= corners[3]) {
         TH = wotInstance.wtTable.getColumnHeader(sourceCol);
 
-        if (TH && this.settings.highlightColumnClassName) {
-          addClass(TH, this.settings.highlightColumnClassName);
+        if (TH) {
+          let newClasses = [];
+
+          if (this.settings.highlightHeaderClassName) {
+            newClasses.push(this.settings.highlightHeaderClassName);
+          }
+
+          if (this.settings.highlightColumnClassName) {
+            newClasses.push(this.settings.highlightColumnClassName);
+          }
+
+          addClass(TH, newClasses);
         }
       }
     }
@@ -160,8 +171,18 @@ class WalkontableSelection {
       if (sourceRow >= corners[0] && sourceRow <= corners[2]) {
         TH = wotInstance.wtTable.getRowHeader(sourceRow);
 
-        if (TH && this.settings.highlightRowClassName) {
-          addClass(TH, this.settings.highlightRowClassName);
+        if (TH) {
+          let newClasses = [];
+
+          if (this.settings.highlightHeaderClassName) {
+            newClasses.push(this.settings.highlightHeaderClassName);
+          }
+
+          if (this.settings.highlightRowClassName) {
+            newClasses.push(this.settings.highlightRowClassName);
+          }
+
+          addClass(TH, newClasses);
         }
       }
 
@@ -199,6 +220,4 @@ class WalkontableSelection {
   }
 }
 
-export {WalkontableSelection};
-
-window.WalkontableSelection = WalkontableSelection;
+export default Selection;

@@ -1,5 +1,34 @@
+import {isIE8, isIE9, isSafari} from '../browser';
+import {hasCaptionProblem} from '../feature';
 
-import {isIE8, isIE9, isSafari, hasCaptionProblem} from '../browser';
+/**
+ * Get the parent of the specified node in the DOM tree.
+ *
+ * @param  {HTMLElement} element Element from which traversing is started.
+ * @param  {Number} [level=0] Traversing deep level.
+ * @return {HTMLElement|null}
+ */
+export function getParent(element, level = 0) {
+  let iteration = -1;
+  let parent = null;
+
+  while (element != null) {
+    if (iteration === level) {
+      parent = element;
+      break;
+    }
+
+    if (element.host && element.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      element = element.host;
+
+    } else {
+      iteration++;
+      element = element.parentNode;
+    }
+  }
+
+  return parent;
+}
 
 /**
  * Goes up the DOM tree (including given element) until it finds an element that matches the nodes or nodes name.
@@ -12,8 +41,7 @@ import {isIE8, isIE9, isSafari, hasCaptionProblem} from '../browser';
  */
 export function closest(element, nodes, until) {
   while (element != null && element !== until) {
-    if (element.nodeType === Node.ELEMENT_NODE &&
-      (nodes.indexOf(element.nodeName) > -1 || nodes.indexOf(element) > -1)) {
+    if (element.nodeType === Node.ELEMENT_NODE && (nodes.indexOf(element.nodeName) > -1 || nodes.indexOf(element) > -1)) {
       return element;
     }
     if (element.host && element.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
@@ -28,18 +56,49 @@ export function closest(element, nodes, until) {
 }
 
 /**
+ * Goes "down" the DOM tree (including given element) until it finds an element that matches the nodes or nodes name.
+ *
+ * @param {HTMLElement} element Element from which traversing is started
+ * @param {Array} nodes Array of elements or Array of elements name
+ * @param {HTMLElement} [until]
+ * @returns {HTMLElement|null}
+ */
+export function closestDown(element, nodes, until) {
+  const matched = [];
+
+  while (element) {
+    element = closest(element, nodes, until);
+
+    if (!element || (until && !until.contains(element))) {
+      break;
+    }
+    matched.push(element);
+
+    if (element.host && element.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      element = element.host;
+
+    } else {
+      element = element.parentNode;
+    }
+  }
+  const length = matched.length;
+
+  return length ? matched[length - 1] : null;
+}
+
+/**
  * Goes up the DOM tree and checks if element is child of another element.
  *
  * @param child Child element
  * @param {Object|String} parent Parent element OR selector of the parent element.
- *                               If string provided, function returns `true` for the first occurance of element with that class.
+ *                               If string provided, function returns `true` for the first occurrence of element with that class.
  * @returns {Boolean}
  */
 export function isChildOf(child, parent) {
   var node = child.parentNode;
   var queriedParents = [];
 
-  if (typeof parent === "string") {
+  if (typeof parent === 'string') {
     queriedParents = Array.prototype.slice.call(document.querySelectorAll(parent), 0);
   } else {
     queriedParents.push(parent);
@@ -51,6 +110,7 @@ export function isChildOf(child, parent) {
     }
     node = node.parentNode;
   }
+
   return false;
 }
 
@@ -75,8 +135,7 @@ export function isChildOfWebComponentTable(element) {
     if (isHotTable(parentNode)) {
       result = true;
       break;
-    }
-    else if (parentNode.host && parentNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+    } else if (parentNode.host && parentNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
       result = isHotTable(parentNode.host);
 
       if (result) {
@@ -125,22 +184,35 @@ export function index(element) {
   var i = 0;
 
   if (element.previousSibling) {
-    /* jshint ignore:start */
+    /* eslint-disable no-cond-assign */
     while (element = element.previousSibling) {
       ++i;
     }
-    /* jshint ignore:end */
   }
 
   return i;
 }
 
+/**
+ * Check if the provided overlay contains the provided element
+ *
+ * @param {String} overlay
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+export function overlayContainsElement(overlayType, element) {
+  let overlayElement = document.querySelector(`.ht_clone_${overlayType}`);
+  return overlayElement ? overlayElement.contains(element) : null;
+}
 
-var classListSupport = document.documentElement.classList ? true : false;
-var _hasClass, _addClass, _removeClass;
+var classListSupport = !!document.documentElement.classList;
+var _hasClass,
+  _addClass,
+  _removeClass;
 
 function filterEmptyClassNames(classNames) {
-  var len = 0, result = [];
+  var len = 0,
+    result = [];
 
   if (!classNames || !classNames.length) {
     return result;
@@ -154,7 +226,7 @@ function filterEmptyClassNames(classNames) {
 }
 
 if (classListSupport) {
-  var isSupportMultipleClassesArg = (function () {
+  var isSupportMultipleClassesArg = (function() {
     var element = document.createElement('div');
 
     element.classList.add('test', 'test2');
@@ -210,12 +282,12 @@ if (classListSupport) {
 
 } else {
   var createClassNameRegExp = function createClassNameRegExp(className) {
-    return new RegExp('(\\s|^)' + className + '(\\s|$)');
+    return new RegExp(`(\\s|^)${className}(\\s|$)`);
   };
 
   _hasClass = function _hasClass(element, className) {
     // http://snipplr.com/view/3561/addclass-removeclass-hasclass/
-    return element.className.match(createClassNameRegExp(className)) ? true : false;
+    return !!element.className.match(createClassNameRegExp(className));
   };
 
   _addClass = function _addClass(element, className) {
@@ -231,7 +303,7 @@ if (classListSupport) {
     } else {
       while (className && className[len]) {
         if (!createClassNameRegExp(className[len]).test(_className)) {
-          _className += ' ' + className[len];
+          _className += ` ${className[len]}`;
         }
         len++;
       }
@@ -290,9 +362,9 @@ export function removeClass(element, className) {
 
 export function removeTextNodes(element, parent) {
   if (element.nodeType === 3) {
-    parent.removeChild(element); //bye text nodes!
-  }
-  else if (['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR'].indexOf(element.nodeName) > -1) {
+    parent.removeChild(element); // bye text nodes!
+
+  } else if (['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR'].indexOf(element.nodeName) > -1) {
     var childs = element.childNodes;
     for (var i = childs.length - 1; i >= 0; i--) {
       removeTextNodes(childs[i], element);
@@ -312,14 +384,13 @@ export function removeTextNodes(element, parent) {
 //
 export function empty(element) {
   var child;
-  /* jshint ignore:start */
+  /* eslint-disable no-cond-assign */
   while (child = element.lastChild) {
     element.removeChild(child);
   }
-  /* jshint ignore:end */
 }
 
-export var HTML_CHARACTERS = /(<(.*)>|&(.*);)/;
+export const HTML_CHARACTERS = /(<(.*)>|&(.*);)/;
 
 /**
  * Insert content into element trying avoid innerHTML method.
@@ -328,8 +399,7 @@ export var HTML_CHARACTERS = /(<(.*)>|&(.*);)/;
 export function fastInnerHTML(element, content) {
   if (HTML_CHARACTERS.test(content)) {
     element.innerHTML = content;
-  }
-  else {
+  } else {
     fastInnerText(element, content);
   }
 }
@@ -339,7 +409,7 @@ export function fastInnerHTML(element, content) {
  * @return {void}
  */
 
-var textContextSupport = document.createTextNode('test').textContent ? true : false;
+var textContextSupport = !!document.createTextNode('test').textContent;
 
 export function fastInnerText(element, content) {
   var child = element.firstChild;
@@ -354,9 +424,8 @@ export function fastInnerText(element, content) {
       // http://jsperf.com/replace-text-vs-reuse
       child.data = content;
     }
-  }
-  else {
-    //slow lane - empty element and insert a text node
+  } else {
+    // slow lane - empty element and insert a text node
     empty(element);
     element.appendChild(document.createTextNode(content));
   }
@@ -370,29 +439,26 @@ export function fastInnerText(element, content) {
 export function isVisible(elem) {
   var next = elem;
 
-  while (polymerUnwrap(next) !== document.documentElement) { //until <html> reached
-    if (next === null) { //parent detached from DOM
+  while (polymerUnwrap(next) !== document.documentElement) { // until <html> reached
+    if (next === null) { // parent detached from DOM
       return false;
-    }
-    else if (next.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-      if (next.host) { //this is Web Components Shadow DOM
-        //see: http://w3c.github.io/webcomponents/spec/shadow/#encapsulation
-        //according to spec, should be if (next.ownerDocument !== window.document), but that doesn't work yet
-        if (next.host.impl) { //Chrome 33.0.1723.0 canary (2013-11-29) Web Platform features disabled
+    } else if (next.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      if (next.host) { // this is Web Components Shadow DOM
+        // see: http://w3c.github.io/webcomponents/spec/shadow/#encapsulation
+        // according to spec, should be if (next.ownerDocument !== window.document), but that doesn't work yet
+        if (next.host.impl) { // Chrome 33.0.1723.0 canary (2013-11-29) Web Platform features disabled
           return isVisible(next.host.impl);
-        }
-        else if (next.host) { //Chrome 33.0.1723.0 canary (2013-11-29) Web Platform features enabled
+
+        } else if (next.host) { // Chrome 33.0.1723.0 canary (2013-11-29) Web Platform features enabled
           return isVisible(next.host);
+
         }
-        else {
-          throw new Error("Lost in Web Components world");
-        }
+        throw new Error('Lost in Web Components world');
+
+      } else {
+        return false; // this is a node detached from document in IE8
       }
-      else {
-        return false; //this is a node detached from document in IE8
-      }
-    }
-    else if (next.style.display === 'none') {
+    } else if (next.style.display === 'none') {
       return false;
     }
     next = next.parentNode;
@@ -430,7 +496,7 @@ export function offset(elem) {
   offsetTop = elem.offsetTop;
   lastElem = elem;
 
-  /* jshint ignore:start */
+  /* eslint-disable no-cond-assign */
   while (elem = elem.offsetParent) {
     // from my observation, document.body always has scrollLeft/scrollTop == 0
     if (elem === document.body) {
@@ -440,11 +506,10 @@ export function offset(elem) {
     offsetTop += elem.offsetTop;
     lastElem = elem;
   }
-  /* jshint ignore:end */
 
-  //slow - http://jsperf.com/offset-vs-getboundingclientrect/6
+  // slow - http://jsperf.com/offset-vs-getboundingclientrect/6
   if (lastElem && lastElem.style.position === 'fixed') {
-    //if(lastElem !== document.body) { //faster but does gives false positive in Firefox
+    // if(lastElem !== document.body) { //faster but does gives false positive in Firefox
     offsetLeft += window.pageXOffset || docElem.scrollLeft;
     offsetTop += window.pageYOffset || docElem.scrollTop;
   }
@@ -463,7 +528,7 @@ export function offset(elem) {
 export function getWindowScrollTop() {
   var res = window.scrollY;
 
-  if (res === void 0) { //IE8-11
+  if (res === void 0) { // IE8-11
     res = document.documentElement.scrollTop;
   }
 
@@ -478,7 +543,7 @@ export function getWindowScrollTop() {
 export function getWindowScrollLeft() {
   var res = window.scrollX;
 
-  if (res === void 0) { //IE8-11
+  if (res === void 0) { // IE8-11
     res = document.documentElement.scrollLeft;
   }
 
@@ -495,9 +560,8 @@ export function getScrollTop(element) {
   if (element === window) {
     return getWindowScrollTop();
   }
-  else {
-    return element.scrollTop;
-  }
+  return element.scrollTop;
+
 }
 
 /**
@@ -510,9 +574,7 @@ export function getScrollLeft(element) {
   if (element === window) {
     return getWindowScrollLeft();
   }
-  else {
-    return element.scrollLeft;
-  }
+  return element.scrollLeft;
 }
 
 /**
@@ -524,7 +586,9 @@ export function getScrollLeft(element) {
 export function getScrollableElement(element) {
   var el = element.parentNode,
     props = ['auto', 'scroll'],
-    overflow, overflowX, overflowY,
+    overflow,
+    overflowX,
+    overflowY,
     computedStyle = '',
     computedOverflow = '',
     computedOverflowY = '',
@@ -537,6 +601,7 @@ export function getScrollableElement(element) {
 
     if (overflow == 'scroll' || overflowX == 'scroll' || overflowY == 'scroll') {
       return el;
+
     } else if (window.getComputedStyle) {
       computedStyle = window.getComputedStyle(el);
       computedOverflow = computedStyle.getPropertyValue('overflow');
@@ -549,11 +614,11 @@ export function getScrollableElement(element) {
     }
 
     if (el.clientHeight <= el.scrollHeight && (props.indexOf(overflowY) !== -1 || props.indexOf(overflow) !== -1 ||
-      props.indexOf(computedOverflow) !== -1 || props.indexOf(computedOverflowY) !== -1)) {
+        props.indexOf(computedOverflow) !== -1 || props.indexOf(computedOverflowY) !== -1)) {
       return el;
     }
     if (el.clientWidth <= el.scrollWidth && (props.indexOf(overflowX) !== -1 || props.indexOf(overflow) !== -1 ||
-      props.indexOf(computedOverflow) !== -1 || props.indexOf(computedOverflowX) !== -1)) {
+        props.indexOf(computedOverflow) !== -1 || props.indexOf(computedOverflowX) !== -1)) {
       return el;
     }
     el = el.parentNode;
@@ -593,33 +658,38 @@ export function getTrimmingContainer(base) {
  * Returns a style property for the provided element. (Be it an inline or external style).
  *
  * @param {HTMLElement} element
- * @param {string} prop Wanted property
- * @returns {string} Element's style property
+ * @param {String} prop Wanted property
+ * @returns {String|undefined} Element's style property
  */
 export function getStyle(element, prop) {
+  /* eslint-disable */
   if (!element) {
     return;
 
   } else if (element === window) {
     if (prop === 'width') {
       return window.innerWidth + 'px';
+
     } else if (prop === 'height') {
       return window.innerHeight + 'px';
     }
+
     return;
   }
 
-  var styleProp = element.style[prop],
+  var
+    styleProp = element.style[prop],
     computedStyle;
-  if (styleProp !== "" && styleProp !== void 0) {
+
+  if (styleProp !== '' && styleProp !== void 0) {
     return styleProp;
 
   } else {
     computedStyle = getComputedStyle(element);
-    if (computedStyle[prop] !== "" && computedStyle[prop] !== void 0) {
+
+    if (computedStyle[prop] !== '' && computedStyle[prop] !== void 0) {
       return computedStyle[prop];
     }
-    return void 0;
   }
 }
 
@@ -645,23 +715,23 @@ export function outerWidth(element) {
 
 /**
  * Returns the element's outer height
+ *
  * @param elem
  * @returns {number} Element's outer height
  */
 export function outerHeight(elem) {
   if (hasCaptionProblem() && elem.firstChild && elem.firstChild.nodeName === 'CAPTION') {
-    //fixes problem with Firefox ignoring <caption> in TABLE.offsetHeight
-    //jQuery (1.10.1) still has this unsolved
-    //may be better to just switch to getBoundingClientRect
-    //http://bililite.com/blog/2009/03/27/finding-the-size-of-a-table/
-    //http://lists.w3.org/Archives/Public/www-style/2009Oct/0089.html
-    //http://bugs.jquery.com/ticket/2196
-    //http://lists.w3.org/Archives/Public/www-style/2009Oct/0140.html#start140
+    // fixes problem with Firefox ignoring <caption> in TABLE.offsetHeight
+    // jQuery (1.10.1) still has this unsolved
+    // may be better to just switch to getBoundingClientRect
+    // http://bililite.com/blog/2009/03/27/finding-the-size-of-a-table/
+    // http://lists.w3.org/Archives/Public/www-style/2009Oct/0089.html
+    // http://bugs.jquery.com/ticket/2196
+    // http://lists.w3.org/Archives/Public/www-style/2009Oct/0140.html#start140
     return elem.offsetHeight + elem.firstChild.offsetHeight;
   }
-  else {
-    return elem.offsetHeight;
-  }
+
+  return elem.offsetHeight;
 }
 
 /**
@@ -709,8 +779,8 @@ export function removeEvent(element, event, callback) {
 export function getCaretPosition(el) {
   if (el.selectionStart) {
     return el.selectionStart;
-  }
-  else if (document.selection) { // IE8
+
+  } else if (document.selection) { // IE8
     el.focus();
 
     let r = document.selection.createRange();
@@ -739,7 +809,7 @@ export function getSelectionEndPosition(el) {
   if (el.selectionEnd) {
     return el.selectionEnd;
 
-  } else if (document.selection) { //IE8
+  } else if (document.selection) { // IE8
     let r = document.selection.createRange();
 
     if (r == null) {
@@ -749,6 +819,25 @@ export function getSelectionEndPosition(el) {
 
     return re.text.indexOf(r.text) + r.text.length;
   }
+
+  return 0;
+}
+
+/**
+ * Returns text under selection.
+ *
+ * @returns {String}
+ */
+export function getSelectionText() {
+  let text = '';
+
+  if (window.getSelection) {
+    text = window.getSelection().toString();
+  } else if (document.selection && document.selection.type !== 'Control') {
+    text = document.selection.createRange().text;
+  }
+
+  return text;
 }
 
 /**
@@ -768,17 +857,14 @@ export function setCaretPosition(element, pos, endPos) {
 
     try {
       element.setSelectionRange(pos, endPos);
-    }
-    catch(err) {
+    } catch (err) {
       var elementParent = element.parentNode;
       var parentDisplayValue = elementParent.style.display;
       elementParent.style.display = 'block';
       element.setSelectionRange(pos, endPos);
       elementParent.style.display = parentDisplayValue;
     }
-
-  }
-  else if (element.createTextRange) { //IE8
+  } else if (element.createTextRange) { // IE8
     var range = element.createTextRange();
     range.collapse(true);
     range.moveEnd('character', endPos);
@@ -789,20 +875,21 @@ export function setCaretPosition(element, pos, endPos) {
 
 var cachedScrollbarWidth;
 
-//http://stackoverflow.com/questions/986937/how-can-i-get-the-browsers-scrollbar-sizes
+// http://stackoverflow.com/questions/986937/how-can-i-get-the-browsers-scrollbar-sizes
 function walkontableCalculateScrollbarWidth() {
-  var inner = document.createElement('p');
-  inner.style.width = "100%";
-  inner.style.height = "200px";
+  var inner = document.createElement('div');
+  inner.style.height = '200px';
+  inner.style.width = '100%';
 
   var outer = document.createElement('div');
-  outer.style.position = "absolute";
-  outer.style.top = "0px";
-  outer.style.left = "0px";
-  outer.style.visibility = "hidden";
-  outer.style.width = "200px";
-  outer.style.height = "150px";
-  outer.style.overflow = "hidden";
+  outer.style.boxSizing = 'content-box';
+  outer.style.height = '150px';
+  outer.style.left = '0px';
+  outer.style.overflow = 'hidden';
+  outer.style.position = 'absolute';
+  outer.style.top = '0px';
+  outer.style.width = '200px';
+  outer.style.visibility = 'hidden';
   outer.appendChild(inner);
 
   (document.body || document.documentElement).appendChild(outer);
@@ -831,6 +918,25 @@ export function getScrollbarWidth() {
   return cachedScrollbarWidth;
 }
 
+/**
+ * Checks if the provided element has a vertical scrollbar.
+ *
+ * @param {HTMLElement} element
+ * @returns {Boolean}
+ */
+export function hasVerticalScrollbar(element) {
+  return element.offsetWidth !== element.clientWidth;
+}
+
+/**
+ * Checks if the provided element has a vertical scrollbar.
+ *
+ * @param {HTMLElement} element
+ * @returns {Boolean}
+ */
+export function hasHorizontalScrollbar(element) {
+  return element.offsetHeight !== element.clientHeight;
+}
 
 /**
  * Sets overlay position depending on it's type and used browser
@@ -840,7 +946,6 @@ export function setOverlayPosition(overlayElem, left, top) {
     overlayElem.style.top = top;
     overlayElem.style.left = left;
   } else if (isSafari()) {
-    /* jshint sub:true */
     overlayElem.style['-webkit-transform'] = 'translate3d(' + left + ',' + top + ',0)';
   } else {
     overlayElem.style.transform = 'translate3d(' + left + ',' + top + ',0)';
@@ -850,8 +955,7 @@ export function setOverlayPosition(overlayElem, left, top) {
 export function getCssTransform(element) {
   var transform;
 
-  /* jshint sub:true */
-  if (element.style['transform'] && (transform = element.style['transform']) !== '') {
+  if (element.style.transform && (transform = element.style.transform) !== '') {
     return ['transform', transform];
 
   } else if (element.style['-webkit-transform'] && (transform = element.style['-webkit-transform']) !== '') {
@@ -863,82 +967,33 @@ export function getCssTransform(element) {
 }
 
 export function resetCssTransform(element) {
-  /* jshint sub:true */
-  if (element['transform'] && element['transform'] !== '') {
-    element['transform'] = '';
-  } else if (element['-webkit-transform'] && element['-webkit-transform'] !== '') {
-    element['-webkit-transform'] = '';
+  if (element.style.transform && element.style.transform !== '') {
+    element.style.transform = '';
+  } else if (element.style['-webkit-transform'] && element.style['-webkit-transform'] !== '') {
+    element.style['-webkit-transform'] = '';
   }
 }
 
 /**
  * Determines if the given DOM element is an input field.
  * Notice: By 'input' we mean input, textarea and select nodes
- * @param element - DOM element
- * @returns {boolean}
+ *
+ * @param {HTMLElement} element - DOM element
+ * @returns {Boolean}
  */
 export function isInput(element) {
   var inputs = ['INPUT', 'SELECT', 'TEXTAREA'];
 
-  return inputs.indexOf(element.nodeName) > -1 || element.contentEditable === 'true';
+  return element && (inputs.indexOf(element.nodeName) > -1 || element.contentEditable === 'true');
 }
 
 /**
  * Determines if the given DOM element is an input field placed OUTSIDE of HOT.
  * Notice: By 'input' we mean input, textarea and select nodes
- * @param element - DOM element
- * @returns {boolean}
+ *
+ * @param {HTMLElement} element - DOM element
+ * @returns {Boolean}
  */
 export function isOutsideInput(element) {
   return isInput(element) && element.className.indexOf('handsontableInput') == -1 && element.className.indexOf('copyPaste') == -1;
-}
-
-
-// https://gist.github.com/paulirish/1579671
-let lastTime = 0;
-let vendors = ['ms', 'moz', 'webkit', 'o'];
-let _requestAnimationFrame = window.requestAnimationFrame;
-let _cancelAnimationFrame = window.cancelAnimationFrame;
-
-for (let x = 0; x < vendors.length && !_requestAnimationFrame; ++x) {
-  _requestAnimationFrame = window[vendors[x] + 'RequestAnimationFrame'];
-  _cancelAnimationFrame = window[vendors[x] + 'CancelAnimationFrame'] || window[vendors[x] + 'CancelRequestAnimationFrame'];
-}
-
-if (!_requestAnimationFrame) {
-  _requestAnimationFrame = function(callback) {
-    let currTime = new Date().getTime();
-    let timeToCall = Math.max(0, 16 - (currTime - lastTime));
-    let id = window.setTimeout(function() {
-      callback(currTime + timeToCall);
-    }, timeToCall);
-    lastTime = currTime + timeToCall;
-
-    return id;
-  };
-}
-
-if (!_cancelAnimationFrame) {
-  _cancelAnimationFrame = function(id) {
-    clearTimeout(id);
-  };
-}
-
-/**
- * Polyfill for requestAnimationFrame
- *
- * @param {Function} callback
- * @returns {Number}
- */
-export function requestAnimationFrame(callback) {
-  return _requestAnimationFrame.call(window, callback);
-}
-
-/**
- * Polyfill for cancelAnimationFrame
- *
- * @param {Number} id
- */
-export function cancelAnimationFrame(id) {
-  _cancelAnimationFrame.call(window, id);
 }

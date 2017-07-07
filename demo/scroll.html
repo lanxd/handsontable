@@ -12,6 +12,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <!--
@@ -110,17 +112,17 @@
           var offset;
 
           if (maxed) {
-            offset = Handsontable.Dom.offset(example);
-            availableWidth = Handsontable.Dom.innerWidth(document.body) - offset.left + window.scrollX;
-            availableHeight = Handsontable.Dom.innerHeight(document.body) - offset.top + window.scrollY;
+            offset = Handsontable.dom.offset(example);
+            availableWidth = Handsontable.dom.innerWidth(document.body) - offset.left + window.scrollX;
+            availableHeight = Handsontable.dom.innerHeight(document.body) - offset.top + window.scrollY;
 
             example.style.width = availableWidth + 'px';
             example.style.height = availableHeight + 'px';
           }
         }
 
-        Handsontable.Dom.addEvent(window, 'resize', calculateSize);
-        Handsontable.Dom.addEvent(maximize, 'click', function() {
+        Handsontable.dom.addEvent(window, 'resize', calculateSize);
+        Handsontable.dom.addEvent(maximize, 'click', function() {
           maxed = !maxed;
 
           if (maxed) {

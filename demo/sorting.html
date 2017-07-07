@@ -12,6 +12,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <!--
@@ -172,7 +174,7 @@
             resetState = document.querySelector('.reset-state');
             stateLoaded = document.querySelector('.state-loaded');
 
-            Handsontable.Dom.addEvent(resetState, 'click', function() {
+            Handsontable.dom.addEvent(resetState, 'click', function() {
               hot.runHooks('persistentStateReset');
               hot.updateSettings({
                 columnSorting: true,

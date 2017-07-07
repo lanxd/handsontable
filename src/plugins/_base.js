@@ -1,6 +1,6 @@
-
 import {defineGetter, objectEach} from './../helpers/object';
 import {arrayEach} from './../helpers/array';
+import {registerIdentity, getTranslator} from './../utils/recordTranslator';
 import {getRegistredPluginNames, getPluginName} from './../plugins';
 
 const privatePool = new WeakMap();
@@ -22,12 +22,16 @@ class BasePlugin {
     defineGetter(this, 'hot', hotInstance, {
       writable: false
     });
+    defineGetter(this, 't', getTranslator(hotInstance), {
+      writable: false
+    });
+
     privatePool.set(this, {hooks: {}});
     initializedPlugins = null;
 
+    this.pluginName = null;
     this.pluginsInitializedCallbacks = [];
     this.isPluginsReady = false;
-    this.pluginName = null;
     this.enabled = false;
     this.initialized = false;
 
@@ -79,7 +83,9 @@ class BasePlugin {
    * @param {Function} callback
    */
   addHook(name, callback) {
-    const hooks = privatePool.get(this).hooks[name] = (privatePool.get(this).hooks[name] || []);
+    privatePool.get(this).hooks[name] = (privatePool.get(this).hooks[name] || []);
+
+    const hooks = privatePool.get(this).hooks[name];
 
     this.hot.addHook(name, callback);
     hooks.push(callback);
@@ -114,7 +120,6 @@ class BasePlugin {
    */
   callOnPluginsReady(callback) {
     if (this.isPluginsReady) {
-      this.pluginsInitializedCallbacks.length = 0;
       callback();
     } else {
       this.pluginsInitializedCallbacks.push(callback);
@@ -128,6 +133,7 @@ class BasePlugin {
    */
   onAfterPluginsInitialized() {
     arrayEach(this.pluginsInitializedCallbacks, (callback) => callback());
+    this.pluginsInitializedCallbacks.length = 0;
     this.isPluginsReady = true;
   }
 
@@ -144,17 +150,36 @@ class BasePlugin {
       if (!this.enabled && this.isEnabled()) {
         this.enablePlugin();
       }
+      if (this.enabled && this.isEnabled()) {
+        this.updatePlugin();
+      }
     }
   }
 
   /**
-   * Destroy plugin
+   * Updates the plugin to use the latest options you have specified.
+   *
+   * @private
+   */
+  updatePlugin() {
+
+  }
+
+  /**
+   * Destroy plugin.
    */
   destroy() {
     if (this.eventManager) {
       this.eventManager.destroy();
     }
     this.clearHooks();
+
+    objectEach(this, (value, property) => {
+      if (property !== 'hot' && property !== 't') {
+        this[property] = null;
+      }
+    });
+    delete this.t;
     delete this.hot;
   }
 }

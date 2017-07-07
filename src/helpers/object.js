@@ -1,3 +1,4 @@
+import {arrayEach} from './array';
 
 /**
  * Generate schema for passed object.
@@ -13,7 +14,11 @@ export function duckSchema(object) {
   } else {
     schema = {};
 
-    objectEach(object, function(value, key) {
+    objectEach(object, (value, key) => {
+      if (key === '__children') {
+        return;
+      }
+
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         schema[key] = duckSchema(value);
 
@@ -51,29 +56,34 @@ export function inherit(Child, Parent) {
 }
 
 /**
- * Perform shallow extend of a target object with extension's own properties
- * @param {Object} target An object that will receive the new properties
- * @param {Object} extension An object containing additional properties to merge into the target
+ * Perform shallow extend of a target object with extension's own properties.
+ *
+ * @param {Object} target An object that will receive the new properties.
+ * @param {Object} extension An object containing additional properties to merge into the target.
  */
 export function extend(target, extension) {
-  objectEach(extension, function(value, key) {
+  objectEach(extension, (value, key) => {
     target[key] = value;
   });
+
+  return target;
 }
 
 /**
- * Perform deep extend of a target object with extension's own properties
- * @param {Object} target An object that will receive the new properties
- * @param {Object} extension An object containing additional properties to merge into the target
+ * Perform deep extend of a target object with extension's own properties.
+ *
+ * @param {Object} target An object that will receive the new properties.
+ * @param {Object} extension An object containing additional properties to merge into the target.
  */
 export function deepExtend(target, extension) {
-  objectEach(extension, function(value, key) {
+  objectEach(extension, (value, key) => {
     if (extension[key] && typeof extension[key] === 'object') {
       if (!target[key]) {
         if (Array.isArray(extension[key])) {
           target[key] = [];
-        }
-        else {
+        } else if (Object.prototype.toString.call(extension[key]) === '[object Date]') {
+          target[key] = extension[key];
+        } else {
           target[key] = {};
         }
       }
@@ -93,7 +103,7 @@ export function deepExtend(target, extension) {
  * @return {Object}
  */
 export function deepClone(obj) {
-  if (typeof obj === "object") {
+  if (typeof obj === 'object') {
     return JSON.parse(JSON.stringify(obj));
   }
 
@@ -109,9 +119,71 @@ export function deepClone(obj) {
 export function clone(object) {
   let result = {};
 
-  objectEach(object, (value, key) => result[key] = value);
+  objectEach(object, (value, key) => {
+    result[key] = value;
+  });
 
   return result;
+}
+
+/**
+ * Extend the Base object (usually prototype) of the functionality the `mixins` objects.
+ *
+ * @param {Object} Base Base object which will be extended.
+ * @param {Object} mixins The object of the functionality will be "copied".
+ * @returns {Object}
+ */
+export function mixin(Base, ...mixins) {
+  if (!Base.MIXINS) {
+    Base.MIXINS = [];
+  }
+  arrayEach(mixins, (mixin) => {
+    Base.MIXINS.push(mixin.MIXIN_NAME);
+
+    objectEach(mixin, (value, key) => {
+      if (Base.prototype[key] !== void 0) {
+        throw new Error(`Mixin conflict. Property '${key}' already exist and cannot be overwritten.`);
+      }
+      if (typeof value === 'function') {
+        Base.prototype[key] = value;
+
+      } else {
+        let getter = function _getter(propertyName, initialValue) {
+          propertyName = `_${propertyName}`;
+
+          let initValue = (value) => {
+            if (Array.isArray(value) || isObject(value)) {
+              value = deepClone(value);
+            }
+
+            return value;
+          };
+
+          return function() {
+            if (this[propertyName] === void 0) {
+              this[propertyName] = initValue(initialValue);
+            }
+
+            return this[propertyName];
+          };
+        };
+        let setter = function _setter(propertyName) {
+          propertyName = `_${propertyName}`;
+
+          return function(value) {
+            this[propertyName] = value;
+          };
+        };
+        Object.defineProperty(Base.prototype, key, {
+          get: getter(key, value),
+          set: setter(key),
+          configurable: true,
+        });
+      }
+    });
+  });
+
+  return Base;
 }
 
 /**
@@ -135,39 +207,11 @@ export function isObject(obj) {
   return Object.prototype.toString.call(obj) == '[object Object]';
 }
 
-export function getPrototypeOf(obj) {
-  var prototype;
-
-  /* jshint ignore:start */
-  if(typeof obj.__proto__ == "object"){
-    prototype = obj.__proto__;
-  } else {
-    var oldConstructor,
-      constructor = obj.constructor;
-
-    if (typeof obj.constructor == "function") {
-      oldConstructor = constructor;
-
-      if (delete obj.constructor){
-        constructor = obj.constructor; // get real constructor
-        obj.constructor = oldConstructor; // restore constructor
-      }
-
-
-    }
-
-    prototype = constructor ? constructor.prototype : null; // needed for IE
-  }
-  /* jshint ignore:end */
-
-  return prototype;
-}
-
 export function defineGetter(object, property, value, options) {
   options.value = value;
-  options.writable = options.writable === false ? false : true;
-  options.enumerable = options.enumerable === false ? false : true;
-  options.configurable = options.configurable === false ? false : true;
+  options.writable = options.writable !== false;
+  options.enumerable = options.enumerable !== false;
+  options.configurable = options.configurable !== false;
 
   Object.defineProperty(object, property, options);
 }
@@ -181,7 +225,7 @@ export function defineGetter(object, property, value, options) {
  */
 export function objectEach(object, iteratee) {
   for (let key in object) {
-    if (!object.hasOwnProperty || (object.hasOwnProperty && object.hasOwnProperty(key))) {
+    if (!object.hasOwnProperty || (object.hasOwnProperty && Object.prototype.hasOwnProperty.call(object, key))) {
       if (iteratee(object[key], key, object) === false) {
         break;
       }
@@ -189,4 +233,97 @@ export function objectEach(object, iteratee) {
   }
 
   return object;
+}
+
+/**
+ * Get object property by its name. Access to sub properties can be achieved by dot notation (e.q. `'foo.bar.baz'`).
+ *
+ * @param {Object} object Object which value will be exported.
+ * @param {String} name Object property name.
+ * @returns {*}
+ */
+export function getProperty(object, name) {
+  let names = name.split('.');
+  let result = object;
+
+  objectEach(names, (name) => {
+    result = result[name];
+
+    if (result === void 0) {
+      result = void 0;
+
+      return false;
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Return object length (recursively).
+ *
+ * @param {*} object Object for which we want get length.
+ * @returns {Number}
+ */
+export function deepObjectSize(object) {
+  if (!isObject(object)) {
+    return 0;
+  }
+  let recursObjLen = function(obj) {
+    let result = 0;
+
+    if (isObject(obj)) {
+      objectEach(obj, (key) => {
+        result += recursObjLen(key);
+      });
+    } else {
+      result++;
+    }
+
+    return result;
+  };
+
+  return recursObjLen(object);
+}
+
+/**
+ * Create object with property where its value change will be observed.
+ *
+ * @param {*} [defaultValue=undefined] Default value.
+ * @param {String} [propertyToListen='value'] Property to listen.
+ * @returns {Object}
+ */
+export function createObjectPropListener(defaultValue, propertyToListen = 'value') {
+  const privateProperty = `_${propertyToListen}`;
+  const holder = {
+    _touched: false,
+    [privateProperty]: defaultValue,
+    isTouched() {
+      return this._touched;
+    }
+  };
+
+  Object.defineProperty(holder, propertyToListen, {
+    get() {
+      return this[privateProperty];
+    },
+    set(value) {
+      this._touched = true;
+      this[privateProperty] = value;
+    },
+    enumerable: true,
+    configurable: true
+  });
+
+  return holder;
+}
+
+/**
+ * Check if at specified `key` there is any value for `object`.
+ *
+ * @param {Object} object Object to search value at specyfic key.
+ * @param {String} key String key to check.
+ */
+export function hasOwnProperty(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
 }

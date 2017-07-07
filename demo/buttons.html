@@ -12,6 +12,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <script data-jsfiddle="common" src="../plugins/removeRow/handsontable.removeRow.js"></script>
@@ -121,15 +123,15 @@
             });
             hot.loadData(data);
 
-            Handsontable.Dom.addEvent(selectFirst, 'click', function () {
+            Handsontable.dom.addEvent(selectFirst, 'click', function () {
               hot.selectCell(0,0);
             });
-            Handsontable.Dom.addEvent(rowHeaders, 'click', function () {
+            Handsontable.dom.addEvent(rowHeaders, 'click', function () {
               hot.updateSettings({
                 rowHeaders: this.checked
               });
             });
-            Handsontable.Dom.addEvent(colHeaders, 'click', function () {
+            Handsontable.dom.addEvent(colHeaders, 'click', function () {
               hot.updateSettings({
                 colHeaders: this.checked
               });

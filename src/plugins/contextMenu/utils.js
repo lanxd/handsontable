@@ -1,5 +1,6 @@
-
+import {arrayEach} from './../../helpers/array';
 import {hasClass} from './../../helpers/dom/element';
+import {KEY as SEPARATOR} from './predefinedItems/separator';
 
 export function normalizeSelection(selRange) {
   return {
@@ -20,6 +21,10 @@ export function isDisabled(cell) {
   return hasClass(cell, 'htDisabled');
 }
 
+export function isSelectionDisabled(cell) {
+  return hasClass(cell, 'htSelectionDisabled');
+}
+
 export function getValidSelection(hot) {
   let selected = hot.getSelected();
 
@@ -27,9 +32,6 @@ export function getValidSelection(hot) {
     return null;
   }
   if (selected[0] < 0) {
-    return null;
-  }
-  if (hot.countRows() >= hot.getSettings().maxRows) {
     return null;
   }
 
@@ -46,7 +48,7 @@ export function prepareVerticalAlignClass(className, alignment) {
     .replace('htBottom', '')
     .replace('  ', '');
 
-  className += ' ' + alignment;
+  className += ` ${alignment}`;
 
   return className;
 }
@@ -62,7 +64,7 @@ export function prepareHorizontalAlignClass(className, alignment) {
     .replace('htJustify', '')
     .replace('  ', '');
 
-  className += ' ' + alignment;
+  className += ` ${alignment}`;
 
   return className;
 }
@@ -82,19 +84,19 @@ export function getAlignmentClasses(range, callback) {
   return classes;
 }
 
-export function align(range, type, alignment, cellDescriptor) {
+export function align(range, type, alignment, cellDescriptor, propertySetter) {
   if (range.from.row == range.to.row && range.from.col == range.to.col) {
-    applyAlignClassName(range.from.row, range.from.col, type, alignment, cellDescriptor);
+    applyAlignClassName(range.from.row, range.from.col, type, alignment, cellDescriptor, propertySetter);
   } else {
     for (let row = range.from.row; row <= range.to.row; row++) {
       for (let col = range.from.col; col <= range.to.col; col++) {
-        applyAlignClassName(row, col, type, alignment, cellDescriptor);
+        applyAlignClassName(row, col, type, alignment, cellDescriptor, propertySetter);
       }
     }
   }
 }
 
-function applyAlignClassName(row, col, type, alignment, cellDescriptor) {
+function applyAlignClassName(row, col, type, alignment, cellDescriptor, propertySetter) {
   let cellMeta = cellDescriptor(row, col);
   let className = alignment;
 
@@ -105,14 +107,15 @@ function applyAlignClassName(row, col, type, alignment, cellDescriptor) {
       className = prepareHorizontalAlignClass(cellMeta.className, alignment);
     }
   }
-  cellMeta.className = className;
+
+  propertySetter(row, col, 'className', className);
 }
 
 export function checkSelectionConsistency(range, comparator) {
   let result = false;
 
   if (range) {
-    range.forAll(function(row, col) {
+    range.forAll((row, col) => {
       if (comparator(row, col)) {
         result = true;
 
@@ -126,5 +129,58 @@ export function checkSelectionConsistency(range, comparator) {
 
 export function markLabelAsSelected(label) {
   // workaround for https://github.com/handsontable/handsontable/issues/1946
-  return '<span class="selected">' + String.fromCharCode(10003) + '</span>' + label;
+  return `<span class="selected">${String.fromCharCode(10003)}</span>${label}`;
+}
+
+export function isItemHidden(item, instance) {
+  return !item.hidden || !(typeof item.hidden == 'function' && item.hidden.call(instance));
+}
+
+function shiftSeparators(items, separator) {
+  let result = items.slice(0);
+
+  for (let i = 0; i < result.length;) {
+    if (result[i].name === separator) {
+      result.shift();
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
+function popSeparators(items, separator) {
+  let result = items.slice(0);
+
+  result.reverse();
+  result = shiftSeparators(result, separator);
+  result.reverse();
+
+  return result;
+}
+
+function removeDuplicatedSeparators(items) {
+  let result = [];
+
+  arrayEach(items, (value, index) => {
+    if (index > 0) {
+      if (result[result.length - 1].name !== value.name) {
+        result.push(value);
+      }
+    } else {
+      result.push(value);
+    }
+  });
+
+  return result;
+}
+
+export function filterSeparators(items, separator = SEPARATOR) {
+  let result = items.slice(0);
+
+  result = shiftSeparators(result, separator);
+  result = popSeparators(result, separator);
+  result = removeDuplicatedSeparators(result);
+
+  return result;
 }

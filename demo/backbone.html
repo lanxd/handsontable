@@ -12,6 +12,8 @@
   <script data-jsfiddle="common" src="../dist/pikaday/pikaday.js"></script>
   <script data-jsfiddle="common" src="../dist/moment/moment.js"></script>
   <script data-jsfiddle="common" src="../dist/zeroclipboard/ZeroClipboard.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/numbro.js"></script>
+  <script data-jsfiddle="common" src="../dist/numbro/languages.js"></script>
   <script data-jsfiddle="common" src="../dist/handsontable.js"></script>
 
   <!--
@@ -203,7 +205,7 @@
               eventHolder.insertBefore(option, eventHolder.firstChild);
             }
 
-            Handsontable.Dom.addEvent(addCar, 'click', function () {
+            Handsontable.dom.addEvent(addCar, 'click', function () {
               cars.add({make: "Tesla", model: "S", year: 2012, weight: 4647.3});
             });
           </script>

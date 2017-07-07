@@ -1,18 +1,17 @@
-
-import {WalkontableCellCoords} from './../cell/coords';
+import CellCoords from './../cell/coords';
 
 /**
- * A cell range is a set of exactly two WalkontableCellCoords (that can be the same or different)
+ * A cell range is a set of exactly two CellCoords (that can be the same or different)
  *
- * @class WalkontableCellRange
+ * @class CellRange
  */
-class WalkontableCellRange {
+class CellRange {
   /**
-   * @param {WalkontableCellCoords} highlight Used to draw bold border around a cell where selection was
+   * @param {CellCoords} highlight Used to draw bold border around a cell where selection was
    *                                          started and to edit the cell when you press Enter
-   * @param {WalkontableCellCoords} from Usually the same as highlight, but in Excel there is distinction - one can change
+   * @param {CellCoords} from Usually the same as highlight, but in Excel there is distinction - one can change
    *                                     highlight within a selection
-   * @param {WalkontableCellCoords} to End selection
+   * @param {CellCoords} to End selection
    */
   constructor(highlight, from, to) {
     this.highlight = highlight;
@@ -60,28 +59,22 @@ class WalkontableCellRange {
   /**
    * Checks if given cell coords is within `from` and `to` cell coords of this range
    *
-   * @param {WalkontableCellCoords} cellCoords
+   * @param {CellCoords} cellCoords
    * @returns {Boolean}
    */
   includes(cellCoords) {
+    let {row, col} = cellCoords;
     let topLeft = this.getTopLeftCorner();
     let bottomRight = this.getBottomRightCorner();
 
-    if (cellCoords.row < 0) {
-      cellCoords.row = 0;
-    }
-    if (cellCoords.col < 0) {
-      cellCoords.col = 0;
-    }
-
-    return topLeft.row <= cellCoords.row && bottomRight.row >= cellCoords.row &&
-        topLeft.col <= cellCoords.col && bottomRight.col >= cellCoords.col;
+    return topLeft.row <= row && bottomRight.row >= row &&
+        topLeft.col <= col && bottomRight.col >= col;
   }
 
   /**
    * Checks if given range is within of this range
    *
-   * @param {WalkontableCellRange} testedRange
+   * @param {CellRange} testedRange
    * @returns {Boolean}
    */
   includesRange(testedRange) {
@@ -91,7 +84,7 @@ class WalkontableCellRange {
   /**
    * Checks if given range is equal to this range
    *
-   * @param {WalkontableCellRange} testedRange
+   * @param {CellRange} testedRange
    * @returns {Boolean}
    */
   isEqual(testedRange) {
@@ -105,7 +98,7 @@ class WalkontableCellRange {
    * Checks if tested range overlaps with the range.
    * Range A is considered to to be overlapping with range B if intersection of A and B or B and A is not empty.
    *
-   * @param {WalkontableCellRange} testedRange
+   * @param {CellRange} testedRange
    * @returns {Boolean}
    */
   overlaps(testedRange) {
@@ -113,7 +106,7 @@ class WalkontableCellRange {
   }
 
   /**
-   * @param {WalkontableCellRange} testedCoords
+   * @param {CellRange} testedCoords
    * @returns {Boolean}
    */
   isSouthEastOf(testedCoords) {
@@ -121,7 +114,7 @@ class WalkontableCellRange {
   }
 
   /**
-   * @param {WalkontableCellRange} testedCoords
+   * @param {CellRange} testedCoords
    * @returns {Boolean}
    */
   isNorthWestOf(testedCoords) {
@@ -131,7 +124,7 @@ class WalkontableCellRange {
   /**
    * Adds a cell to a range (only if exceeds corners of the range). Returns information if range was expanded
    *
-   * @param {WalkontableCellCoords} cellCoords
+   * @param {CellCoords} cellCoords
    * @returns {Boolean}
    */
   expand(cellCoords) {
@@ -140,8 +133,8 @@ class WalkontableCellRange {
 
     if (cellCoords.row < topLeft.row || cellCoords.col < topLeft.col ||
         cellCoords.row > bottomRight.row || cellCoords.col > bottomRight.col) {
-      this.from = new WalkontableCellCoords(Math.min(topLeft.row, cellCoords.row), Math.min(topLeft.col, cellCoords.col));
-      this.to = new WalkontableCellCoords(Math.max(bottomRight.row, cellCoords.row), Math.max(bottomRight.col, cellCoords.col));
+      this.from = new CellCoords(Math.min(topLeft.row, cellCoords.row), Math.min(topLeft.col, cellCoords.col));
+      this.to = new CellCoords(Math.max(bottomRight.row, cellCoords.row), Math.max(bottomRight.col, cellCoords.col));
 
       return true;
     }
@@ -150,7 +143,7 @@ class WalkontableCellRange {
   }
 
   /**
-   * @param {WalkontableCellRange} expandingRange
+   * @param {CellRange} expandingRange
    * @returns {Boolean}
    */
   expandByRange(expandingRange) {
@@ -171,10 +164,10 @@ class WalkontableCellRange {
     let resultBottomRow = Math.max(bottomRight.row, expandingBottomRight.row);
     let resultBottomCol = Math.max(bottomRight.col, expandingBottomRight.col);
 
-    let finalFrom = new WalkontableCellCoords(resultTopRow, resultTopCol),
-      finalTo = new WalkontableCellCoords(resultBottomRow, resultBottomCol);
-    let isCorner = new WalkontableCellRange(finalFrom, finalFrom, finalTo).isCorner(this.from, expandingRange),
-      onlyMerge = expandingRange.isEqual(new WalkontableCellRange(finalFrom, finalFrom, finalTo));
+    let finalFrom = new CellCoords(resultTopRow, resultTopCol),
+      finalTo = new CellCoords(resultBottomRow, resultBottomCol);
+    let isCorner = new CellRange(finalFrom, finalFrom, finalTo).isCorner(this.from, expandingRange),
+      onlyMerge = expandingRange.isEqual(new CellRange(finalFrom, finalFrom, finalTo));
 
     if (isCorner && !onlyMerge) {
       if (this.from.col > finalFrom.col) {
@@ -216,20 +209,18 @@ class WalkontableCellRange {
   setDirection(direction) {
     switch (direction) {
       case 'NW-SE':
-        this.from = this.getTopLeftCorner();
-        this.to = this.getBottomRightCorner();
+        [this.from, this.to] = [this.getTopLeftCorner(), this.getBottomRightCorner()];
         break;
       case 'NE-SW':
-        this.from = this.getTopRightCorner();
-        this.to = this.getBottomLeftCorner();
+        [this.from, this.to] = [this.getTopRightCorner(), this.getBottomLeftCorner()];
         break;
       case 'SE-NW':
-        this.from = this.getBottomRightCorner();
-        this.to = this.getTopLeftCorner();
+        [this.from, this.to] = [this.getBottomRightCorner(), this.getTopLeftCorner()];
         break;
       case 'SW-NE':
-        this.from = this.getBottomLeftCorner();
-        this.to = this.getTopRightCorner();
+        [this.from, this.to] = [this.getBottomLeftCorner(), this.getTopRightCorner()];
+        break;
+      default:
         break;
     }
   }
@@ -237,51 +228,51 @@ class WalkontableCellRange {
   /**
    * Get top left corner of this range
    *
-   * @returns {WalkontableCellCoords}
+   * @returns {CellCoords}
    */
   getTopLeftCorner() {
-    return new WalkontableCellCoords(Math.min(this.from.row, this.to.row), Math.min(this.from.col, this.to.col));
+    return new CellCoords(Math.min(this.from.row, this.to.row), Math.min(this.from.col, this.to.col));
   }
 
   /**
    * Get bottom right corner of this range
    *
-   * @returns {WalkontableCellCoords}
+   * @returns {CellCoords}
    */
   getBottomRightCorner() {
-    return new WalkontableCellCoords(Math.max(this.from.row, this.to.row), Math.max(this.from.col, this.to.col));
+    return new CellCoords(Math.max(this.from.row, this.to.row), Math.max(this.from.col, this.to.col));
   }
 
   /**
    * Get top right corner of this range
    *
-   * @returns {WalkontableCellCoords}
+   * @returns {CellCoords}
    */
   getTopRightCorner() {
-    return new WalkontableCellCoords(Math.min(this.from.row, this.to.row), Math.max(this.from.col, this.to.col));
+    return new CellCoords(Math.min(this.from.row, this.to.row), Math.max(this.from.col, this.to.col));
   }
 
   /**
    * Get bottom left corner of this range
    *
-   * @returns {WalkontableCellCoords}
+   * @returns {CellCoords}
    */
   getBottomLeftCorner() {
-    return new WalkontableCellCoords(Math.max(this.from.row, this.to.row), Math.min(this.from.col, this.to.col));
+    return new CellCoords(Math.max(this.from.row, this.to.row), Math.min(this.from.col, this.to.col));
   }
 
   /**
-   * @param {WalkontableCellCoords} coords
-   * @param {WalkontableCellRange} expandedRange
+   * @param {CellCoords} coords
+   * @param {CellRange} expandedRange
    * @returns {*}
    */
   isCorner(coords, expandedRange) {
     if (expandedRange) {
       if (expandedRange.includes(coords)) {
-        if (this.getTopLeftCorner().isEqual(new WalkontableCellCoords(expandedRange.from.row, expandedRange.from.col)) ||
-            this.getTopRightCorner().isEqual(new WalkontableCellCoords(expandedRange.from.row, expandedRange.to.col)) ||
-            this.getBottomLeftCorner().isEqual(new WalkontableCellCoords(expandedRange.to.row, expandedRange.from.col)) ||
-            this.getBottomRightCorner().isEqual(new WalkontableCellCoords(expandedRange.to.row, expandedRange.to.col))) {
+        if (this.getTopLeftCorner().isEqual(new CellCoords(expandedRange.from.row, expandedRange.from.col)) ||
+            this.getTopRightCorner().isEqual(new CellCoords(expandedRange.from.row, expandedRange.to.col)) ||
+            this.getBottomLeftCorner().isEqual(new CellCoords(expandedRange.to.row, expandedRange.from.col)) ||
+            this.getBottomRightCorner().isEqual(new CellCoords(expandedRange.to.row, expandedRange.to.col))) {
           return true;
         }
       }
@@ -292,27 +283,27 @@ class WalkontableCellRange {
   }
 
   /**
-   * @param {WalkontableCellCoords} coords
-   * @param {WalkontableCellRange} expandedRange
-   * @returns {WalkontableCellCoords}
+   * @param {CellCoords} coords
+   * @param {CellRange} expandedRange
+   * @returns {CellCoords}
    */
   getOppositeCorner(coords, expandedRange) {
-    if (!(coords instanceof WalkontableCellCoords)) {
+    if (!(coords instanceof CellCoords)) {
       return false;
     }
 
     if (expandedRange) {
       if (expandedRange.includes(coords)) {
-        if (this.getTopLeftCorner().isEqual(new WalkontableCellCoords(expandedRange.from.row, expandedRange.from.col))) {
+        if (this.getTopLeftCorner().isEqual(new CellCoords(expandedRange.from.row, expandedRange.from.col))) {
           return this.getBottomRightCorner();
         }
-        if (this.getTopRightCorner().isEqual(new WalkontableCellCoords(expandedRange.from.row, expandedRange.to.col))) {
+        if (this.getTopRightCorner().isEqual(new CellCoords(expandedRange.from.row, expandedRange.to.col))) {
           return this.getBottomLeftCorner();
         }
-        if (this.getBottomLeftCorner().isEqual(new WalkontableCellCoords(expandedRange.to.row, expandedRange.from.col))) {
+        if (this.getBottomLeftCorner().isEqual(new CellCoords(expandedRange.to.row, expandedRange.from.col))) {
           return this.getTopRightCorner();
         }
-        if (this.getBottomRightCorner().isEqual(new WalkontableCellCoords(expandedRange.to.row, expandedRange.to.col))) {
+        if (this.getBottomRightCorner().isEqual(new CellCoords(expandedRange.to.row, expandedRange.to.col))) {
           return this.getTopLeftCorner();
         }
       }
@@ -333,7 +324,7 @@ class WalkontableCellRange {
   }
 
   /**
-   * @param {WalkontableCellRange} range
+   * @param {CellRange} range
    * @returns {Array}
    */
   getBordersSharedWith(range) {
@@ -384,7 +375,7 @@ class WalkontableCellRange {
     for (let r = topLeft.row; r <= bottomRight.row; r++) {
       for (let c = topLeft.col; c <= bottomRight.col; c++) {
         if (!(this.from.row === r && this.from.col === c) && !(this.to.row === r && this.to.col === c)) {
-          out.push(new WalkontableCellCoords(r, c));
+          out.push(new CellCoords(r, c));
         }
       }
     }
@@ -410,7 +401,7 @@ class WalkontableCellRange {
           out.push(bottomRight);
 
         } else {
-          out.push(new WalkontableCellCoords(r, c));
+          out.push(new CellCoords(r, c));
         }
       }
     }
@@ -440,6 +431,4 @@ class WalkontableCellRange {
   }
 }
 
-export {WalkontableCellRange};
-
-window.WalkontableCellRange = WalkontableCellRange;
+export default CellRange;
